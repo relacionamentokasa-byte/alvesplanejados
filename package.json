@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "npm --prefix backend start",
+    "start": "node backend/dist/server.js || npm --prefix backend start || node dist/server.js",
     "build": "npm --prefix backend run build",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
