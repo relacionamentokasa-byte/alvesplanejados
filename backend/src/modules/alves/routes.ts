@@ -310,7 +310,7 @@ alvesRouter.get('/contratos/:id', async (req, res) => {
   return res.json({ contrato: serializeContract(contract) });
 });
 
-alvesRouter.patch('/contratos/:token/assinatura-digital', async (req, res) => {
+const handleAssinaturaDigital = async (req: Request, res: Response) => {
   try {
     const signer = z.object({ nome: z.string().min(2), documento: z.string().min(2), email: z.string().email() }).parse(req.body);
     const now = new Date().toISOString();
@@ -348,13 +348,10 @@ alvesRouter.patch('/contratos/:token/assinatura-digital', async (req, res) => {
     if (err?.code === 'P2025') return res.status(404).json({ error: 'Contrato não encontrado' });
     return res.status(500).json({ error: 'Erro ao registrar assinatura eletrônica' });
   }
-});
+};
 
-// Compatibilidade de rota retroativa
-alvesRouter.patch('/contratos/:token/assinatura-demonstrativa', (req, res, next) => {
-  req.url = req.url.replace('/assinatura-demonstrativa', '/assinatura-digital');
-  return alvesRouter.handle(req, res, next);
-});
+alvesRouter.patch('/contratos/:token/assinatura-digital', handleAssinaturaDigital);
+alvesRouter.patch('/contratos/:token/assinatura-demonstrativa', handleAssinaturaDigital);
 
 // ==================== ROTAS DE GESTÃO FINANCEIRA ====================
 const serializeFinancialEntry = (entry: any) => ({
