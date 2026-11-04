@@ -32,8 +32,13 @@ alvesAuthRouter.post('/login', async (req: Request, res: Response) => {
     return res.json({ token: signAlvesToken(payload), user: payload });
   } catch (err: any) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
-    console.error('Erro no login Alves:', err);
-    return res.status(500).json({ error: 'Erro interno ao autenticar área Alves' });
+    console.error('Erro detalhado no login Alves:', err);
+    const errorDetails = process.env.NODE_ENV === 'production' && !err?.message?.includes('prisma')
+      ? err?.message
+      : 'Erro de conexão com o banco de dados ou autenticação.';
+    return res.status(500).json({
+      error: `Erro interno ao autenticar área Alves: ${err?.message || 'desconhecido'}`
+    });
   }
 });
 
