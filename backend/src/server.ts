@@ -14,6 +14,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3333;
+const HOST = '0.0.0.0';
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -34,6 +35,6 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', name: 'Libus Partner API', version: '1.0.0' });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Libus Partner Backend rodando em http://localhost:${PORT}`);
+app.listen(Number(PORT), HOST, () => {
+  console.log(`🚀 Alves Planejados Backend rodando na porta ${PORT} (${HOST})`);
 });
