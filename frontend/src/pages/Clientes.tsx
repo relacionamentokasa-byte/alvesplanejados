@@ -164,10 +164,7 @@ export const ClientesPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-sans text-2xl font-semibold text-[#231B15]">Clientes Cadastrados</h1>
-          <p className="text-xs text-[#6E645C] mt-1">
-            Cadastre e gerencie os clientes para rápida reutilização em novas propostas e contratos.
-          </p>
+          <h1 className="font-sans text-2xl font-semibold text-[#231B15]">Clientes</h1>
         </div>
 
         <button
@@ -180,8 +177,8 @@ export const ClientesPage: React.FC = () => {
       </div>
 
       {/* Barra de Busca e Filtro */}
-      <div className="bg-white p-4 rounded-2xl border border-[#E8E2D9] shadow-sm flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="bg-white p-4 rounded-2xl border border-[#E8E2D9] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md w-full">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9B9087]" />
           <input
             type="text"
@@ -191,7 +188,7 @@ export const ClientesPage: React.FC = () => {
             className="w-full pl-10 pr-4 py-2 bg-[#FAF8F5] border border-[#E8E2D9] rounded-xl text-xs text-[#231B15] placeholder-[#9B9087] focus:outline-none focus:border-[#C5A265] transition-colors"
           />
         </div>
-        <div className="text-xs text-[#6E645C]">
+        <div className="text-xs text-[#6E645C] self-end sm:self-center">
           Total: <span className="font-semibold text-[#231B15]">{clientesFiltrados.length} clientes</span>
         </div>
       </div>
@@ -233,23 +230,42 @@ export const ClientesPage: React.FC = () => {
                         )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#6E645C] pt-1">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-[#6E645C] pt-2">
                         {cli.whatsapp && (
-                          <span className="flex items-center space-x-1 text-emerald-800">
+                          <a
+                            href={`https://wa.me/55${cli.whatsapp.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center space-x-1 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-semibold active:scale-95 transition-transform"
+                          >
                             <MessageSquare size={13} className="text-emerald-600" />
-                            <span>{cli.whatsapp}</span>
-                          </span>
+                            <span>WhatsApp</span>
+                          </a>
+                        )}
+                        {cli.whatsapp && (
+                          <a
+                            href={`tel:${cli.whatsapp.replace(/\D/g, '')}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center space-x-1 bg-[#FAF8F5] text-[#231B15] hover:bg-[#F2EFEB] border border-[#E8E2D9] px-2.5 py-1 rounded-lg text-xs font-medium active:scale-95 transition-transform"
+                          >
+                            <span>Ligar</span>
+                          </a>
                         )}
                         {cli.email && (
-                          <span className="flex items-center space-x-1">
+                          <a
+                            href={`mailto:${cli.email}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center space-x-1 text-[#6E645C] hover:text-[#1B1410] px-1 py-0.5"
+                          >
                             <Mail size={13} className="text-[#9B9087]" />
-                            <span>{cli.email}</span>
-                          </span>
+                            <span className="truncate max-w-[150px]">{cli.email}</span>
+                          </a>
                         )}
                         {cli.endereco.cidade && (
-                          <span className="flex items-center space-x-1">
+                          <span className="flex items-center space-x-1 text-[#9B9087]">
                             <MapPin size={13} className="text-[#9B9087]" />
-                            <span>{cli.endereco.bairro}, {cli.endereco.cidade} - {cli.endereco.uf}</span>
+                            <span>{cli.endereco.bairro}, {cli.endereco.cidade}</span>
                           </span>
                         )}
                       </div>
@@ -405,11 +421,8 @@ export const ClientesPage: React.FC = () => {
             <div className="bg-[#1B1410] text-[#FAF8F5] p-5 sm:p-6 flex items-center justify-between border-b border-[#2A1F19]">
               <div>
                 <h3 className="font-sans text-lg font-semibold text-[#FAF8F5]">
-                  {editingCliente ? 'Editar Cadastro de Cliente' : 'Cadastrar Novo Cliente'}
+                  {editingCliente ? 'Editar Cliente' : 'Novo Cliente'}
                 </h3>
-                <p className="text-xs text-[#C5A265]">
-                  Preencha as informações para reutilização nos orçamentos
-                </p>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}

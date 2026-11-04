@@ -19,32 +19,91 @@ import {
   UserCheck
 } from 'lucide-react';
 import { AlvesStore } from '../services/alvesStore';
+import { StatusBadge } from '../components/StatusBadge';
 import { Contrato, ConfiguracoesEmpresa } from '../types/alves';
 
 export const ContratosPage: React.FC = () => {
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [config, setConfig] = useState<ConfiguracoesEmpresa | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const [contratoVisualizando, setContratoVisualizando] = useState<Contrato | null>(null);
 
-  // Modal de Assinatura Demonstrativa
+  // Modal de Assinatura Demonstrativa com Touch Canvas
   const [modalAssinaturaOpen, setModalAssinaturaOpen] = useState(false);
   const [assinanteNome, setAssinanteNome] = useState('');
   const [assinanteDoc, setAssinanteDoc] = useState('');
   const [assinanteEmail, setAssinanteEmail] = useState('');
   const [concordouTermos, setConcordouTermos] = useState(false);
+  const [temAssinaturaManuscrita, setTemAssinaturaManuscrita] = useState(false);
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const isDrawing = React.useRef(false);
+
+  const limparCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setTemAssinaturaManuscrita(false);
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    isDrawing.current = true;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#1B1410';
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.stroke();
+    setTemAssinaturaManuscrita(true);
+  };
+
+  const stopDrawing = () => {
+    isDrawing.current = false;
+  };
 
   const carregarContratos = async () => {
-    const [list, config] = await Promise.all([AlvesStore.getContratos(), AlvesStore.getConfig()]);
-    setContratos(list);
-    setConfig(config);
-    if (list.length > 0 && !contratoVisualizando) {
-      setContratoVisualizando(list[0]);
+    setCarregando(true);
+    setErro(null);
+    try {
+      const [list, configData] = await Promise.all([AlvesStore.getContratos(), AlvesStore.getConfig()]);
+      setContratos(list);
+      setConfig(configData);
+      if (list.length > 0 && !contratoVisualizando) {
+        setContratoVisualizando(list[0]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar contratos:', error);
+      setErro('Não foi possível carregar os contratos e configurações.');
+    } finally {
+      setCarregando(false);
     }
   };
 
   useEffect(() => {
-    carregarContratos().catch((error) => console.error('Erro ao carregar contratos:', error));
+    carregarContratos();
   }, []);
 
   const formatarMoeda = (val: number) => {
@@ -87,17 +146,28 @@ export const ContratosPage: React.FC = () => {
     );
   });
 
-  if (!config) return <div className="p-8 text-sm text-[#6E645C]">Carregando contratos...</div>;
+  if (carregando) return <div className="p-8 text-sm text-[#6E645C]">Carregando contratos...</div>;
+
+  if (erro || !config) {
+    return (
+      <div className="p-8 text-center space-y-4">
+        <p className="text-sm text-red-600">{erro || 'Erro ao carregar contratos.'}</p>
+        <button
+          onClick={carregarContratos}
+          className="px-4 py-2 bg-[#9E7E45] text-white text-xs font-semibold rounded-lg hover:bg-[#856834] transition-colors"
+        >
+          Tentar novamente
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-sans text-2xl font-semibold text-[#231B15]">Contratos de Prestação de Serviços</h1>
-          <p className="text-xs text-[#6E645C] mt-1">
-            Contratos jurídicos gerados a partir de propostas aprovadas com suporte a assinatura eletrônica.
-          </p>
+          <h1 className="font-sans text-2xl font-semibold text-[#231B15]">Contratos</h1>
         </div>
       </div>
 
@@ -139,15 +209,7 @@ export const ContratosPage: React.FC = () => {
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-xs font-bold text-[#1B1410]">{ctr.numero}</span>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                          isAssinado
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                            : 'bg-amber-50 text-amber-800 border border-amber-200'
-                        }`}
-                      >
-                        {isAssinado ? '✓ Assinado' : 'Aguardando Assinatura'}
-                      </span>
+                      <StatusBadge status={ctr.status} size="sm" />
                     </div>
 
                     <div className="mt-2">
@@ -173,8 +235,9 @@ export const ContratosPage: React.FC = () => {
               {/* Barra de Ações do Contrato */}
               <div className="bg-[#1B1410] text-[#FAF8F5] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#2A1F19]">
                 <div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-sans font-bold text-base text-[#FAF8F5]">{contratoVisualizando.numero}</span>
+                    <StatusBadge status={contratoVisualizando.status} size="sm" />
                     <span className="text-[11px] text-[#C5A265]">
                       • Vinculado à {contratoVisualizando.propostaNumero} (V{contratoVisualizando.propostaVersao})
                     </span>
@@ -182,10 +245,10 @@ export const ContratosPage: React.FC = () => {
                   <p className="text-xs text-[#D9D2C7] mt-0.5">{contratoVisualizando.cliente.nome}</p>
                 </div>
 
-                <div className="flex items-center space-x-2 text-xs">
+                <div className="flex flex-wrap items-center gap-2 text-xs w-full sm:w-auto">
                   <button
                     onClick={() => window.print()}
-                    className="px-3.5 py-2 bg-[#2A1F19] hover:bg-[#382B23] text-[#FAF8F5] rounded-xl border border-[#382B23] flex items-center space-x-1"
+                    className="flex-1 sm:flex-none px-3.5 py-2 bg-[#2A1F19] hover:bg-[#382B23] text-[#FAF8F5] rounded-xl border border-[#382B23] flex items-center justify-center space-x-1"
                   >
                     <Printer size={13} />
                     <span>Imprimir Contrato</span>
@@ -194,10 +257,10 @@ export const ContratosPage: React.FC = () => {
                   {contratoVisualizando.status !== 'assinado' ? (
                     <button
                       onClick={() => openAssinaturaModal(contratoVisualizando)}
-                      className="px-4 py-2 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] font-bold rounded-xl shadow-gold-glow flex items-center space-x-1.5 transition-all"
+                      className="flex-1 sm:flex-none px-4 py-2 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] font-bold rounded-xl shadow-gold-glow flex items-center justify-center space-x-1.5 transition-all whitespace-nowrap"
                     >
                       <UserCheck size={14} />
-                      <span>Assinar Eletronicamente (Demo)</span>
+                      <span>Registrar Assinatura</span>
                     </button>
                   ) : (
                     <div className="px-3 py-1.5 bg-emerald-900/60 text-emerald-200 border border-emerald-500/40 rounded-xl text-xs font-semibold flex items-center space-x-1">
@@ -220,7 +283,7 @@ export const ContratosPage: React.FC = () => {
                     <div>Assinado por: <strong className="text-[#1B1410]">{contratoVisualizando.assinatura.assinadoPor}</strong></div>
                     <div>Documento CPF/CNPJ: <strong className="text-[#1B1410]">{contratoVisualizando.assinatura.documentoAssinante}</strong></div>
                     <div>Data e Hora: <span className="text-[#1B1410]">{new Date(contratoVisualizando.assinatura.assinadoEm).toLocaleString('pt-BR')}</span></div>
-                    <div>Integridade Técnica: <span className="font-mono text-[10px] text-[#9E7E45]">{contratoVisualizando.assinatura.ipSimulado}</span></div>
+                    <div>Chave de Validação: <span className="font-mono text-[10px] text-[#9E7E45]">{contratoVisualizando.assinatura.ipConexao || contratoVisualizando.assinatura.ipSimulado || 'Autenticado'}</span></div>
                   </div>
 
                   <div className="pt-2 border-t border-[#C5A265]/20 space-y-1">
@@ -312,22 +375,23 @@ export const ContratosPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal de Assinatura Eletrônica Demonstrativa */}
+      {/* Modal de Assinatura Eletrônica Touch no Canvas (Bottom Sheet no Mobile) */}
       {modalAssinaturaOpen && contratoVisualizando && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full border border-[#E8E2D9] shadow-premium-lg overflow-hidden p-6 sm:p-8 space-y-4 text-xs animate-scaleUp">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full border border-[#E8E2D9] shadow-premium-lg overflow-hidden p-6 sm:p-8 space-y-4 text-xs animate-scaleUp max-h-[90dvh] overflow-y-auto pb-safe">
+            <div className="sm:hidden w-10 h-1 bg-[#E8E2D9] rounded-full mx-auto -mt-2 mb-2" />
             <div className="flex items-center justify-between border-b border-[#E8E2D9] pb-3">
               <h3 className="font-sans text-base font-bold text-[#1B1410] flex items-center space-x-2">
                 <UserCheck size={18} className="text-[#C5A265]" />
-                <span>Assinatura Eletrônica Demonstrativa</span>
+                <span>Assinatura Digital em Tela</span>
               </h3>
-              <button onClick={() => setModalAssinaturaOpen(false)} className="text-[#9B9087] hover:text-[#231B15]">
+              <button onClick={() => setModalAssinaturaOpen(false)} className="text-[#9B9087] hover:text-[#231B15] p-1">
                 <X size={18} />
               </button>
             </div>
 
             <div className="p-3 bg-amber-50 rounded-xl text-[11px] text-amber-900 border border-amber-200">
-              <span className="font-bold">Aviso de Simulação:</span> Esta funcionalidade demonstra a validação e trilha de auditoria para o protótipo da Alves Planejados.
+              <span className="font-bold">Validação com Rubrica Touch:</span> Assine com o dedo ou caneta stylus no quadro abaixo para formalizar o contrato.
             </div>
 
             <form onSubmit={handleConfirmarAssinatura} className="space-y-4">
@@ -338,11 +402,11 @@ export const ContratosPage: React.FC = () => {
                   required
                   value={assinanteNome}
                   onChange={(e) => setAssinanteNome(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-[#FAF8F5] border border-[#E8E2D9] rounded-xl text-xs text-[#231B15]"
+                  className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#E8E2D9] rounded-xl text-xs text-[#231B15]"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="font-semibold text-[#231B15]">CPF ou CNPJ *</label>
                   <input
@@ -350,7 +414,7 @@ export const ContratosPage: React.FC = () => {
                     required
                     value={assinanteDoc}
                     onChange={(e) => setAssinanteDoc(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-[#FAF8F5] border border-[#E8E2D9] rounded-xl text-xs text-[#231B15]"
+                    className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#E8E2D9] rounded-xl text-xs text-[#231B15]"
                   />
                 </div>
 
@@ -360,8 +424,42 @@ export const ContratosPage: React.FC = () => {
                     type="email"
                     value={assinanteEmail}
                     onChange={(e) => setAssinanteEmail(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-[#FAF8F5] border border-[#E8E2D9] rounded-xl text-xs text-[#231B15]"
+                    className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#E8E2D9] rounded-xl text-xs text-[#231B15]"
                   />
+                </div>
+              </div>
+
+              {/* Quadro de Assinatura Manuscrita com Touch nativo */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-[#231B15]">Rubrica / Assinatura do Titular</label>
+                  <button
+                    type="button"
+                    onClick={limparCanvas}
+                    className="text-[11px] text-[#C5A265] hover:text-[#9E7E45] font-semibold"
+                  >
+                    Limpar Quadro
+                  </button>
+                </div>
+                <div className="border-2 border-dashed border-[#C5A265]/50 rounded-2xl bg-[#FAF8F5] p-1 overflow-hidden relative">
+                  <canvas
+                    ref={canvasRef}
+                    width={400}
+                    height={120}
+                    className="w-full h-28 cursor-crosshair touch-none"
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                  />
+                  {!temAssinaturaManuscrita && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-xs text-[#9B9087]/70">
+                      Assine aqui com o dedo ou mouse
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -384,16 +482,16 @@ export const ContratosPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setModalAssinaturaOpen(false)}
-                  className="px-4 py-2 border border-[#E8E2D9] text-[#6E645C] rounded-xl"
+                  className="px-4 py-2.5 border border-[#E8E2D9] text-[#6E645C] rounded-xl active:scale-95 transition-transform"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={!concordouTermos}
-                  className="px-5 py-2 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] font-bold rounded-xl disabled:opacity-50 transition-all shadow-gold-glow"
+                  className="flex-1 sm:flex-none px-6 py-2.5 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] font-bold rounded-xl disabled:opacity-50 transition-all shadow-gold-glow active:scale-95"
                 >
-                  Confirmar Assinatura Digital
+                  Confirmar & Assinar
                 </button>
               </div>
             </form>

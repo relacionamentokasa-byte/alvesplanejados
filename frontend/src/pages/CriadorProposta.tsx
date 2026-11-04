@@ -61,7 +61,7 @@ export const CriadorPropostaPage: React.FC = () => {
   const [clienteId, setClienteId] = useState<string>('');
   const [nomeProjeto, setNomeProjeto] = useState<string>('');
   const [enderecoObra, setEnderecoObra] = useState<string>('');
-  const [responsavel, setResponsavel] = useState<string>('Ariel Matos (Consultor de Projetos)');
+  const [responsavel, setResponsavel] = useState<string>('Elioenai Alves (Alves Planejados)');
   const [dataEmissao, setDataEmissao] = useState<string>(new Date().toISOString().split('T')[0]);
   const [dataValidade, setDataValidade] = useState<string>(
     new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -272,30 +272,37 @@ export const CriadorPropostaPage: React.FC = () => {
     }));
   };
 
-  // Imagens no Ambiente
+  // Imagens no Ambiente (com suporte a upload local/câmera do smartphone e URL)
   const adicionarImagemAmbiente = (ambId: string) => {
-    const url = prompt(
-      'Insira a URL da imagem/render 3D (ou utilize imagens de exemplo Unsplash):',
-      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'
-    );
-    if (!url) return;
+    // Input oculto dinâmico para disparo direto no mobile
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e: any) => {
+      const file = e.target?.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target?.result as string;
+          const novaImg: ImagemAmbiente = {
+            id: 'img-' + Date.now(),
+            url: base64,
+            nome: file.name.replace(/\.[^/.]+$/, "") || 'Render / Foto Obra',
+            principal: false
+          };
 
-    const nome = prompt('Título/Legenda da imagem:', 'Perspectiva 3D Renderizada') || 'Imagem do Projeto';
-
-    const novaImg: ImagemAmbiente = {
-      id: 'img-' + Date.now(),
-      url,
-      nome,
-      principal: false
+          setAmbientes(prev => prev.map(a => {
+            if (a.id !== ambId) return a;
+            return {
+              ...a,
+              imagens: [...a.imagens, novaImg]
+            };
+          }));
+        };
+        reader.readAsDataURL(file);
+      }
     };
-
-    setAmbientes(ambientes.map(a => {
-      if (a.id !== ambId) return a;
-      return {
-        ...a,
-        imagens: [...a.imagens, novaImg]
-      };
-    }));
+    input.click();
   };
 
   const removerImagemAmbiente = (ambId: string, imgId: string) => {
@@ -451,44 +458,42 @@ export const CriadorPropostaPage: React.FC = () => {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E8E2D9] pb-4">
         <div>
-          <div className="flex items-center space-x-2">
-            <span className="font-sans text-2xl font-semibold text-[#1B1410]">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-sans text-xl sm:text-2xl font-semibold text-[#1B1410]">
               {id ? `Editar Proposta — ${numero}` : 'Criador de Proposta Comercial'}
             </span>
             <span className="text-xs bg-[#FAF3E8] text-[#9E7E45] border border-[#C5A265]/40 px-2.5 py-0.5 rounded-full font-semibold">
               Versão {versao}
             </span>
           </div>
-          <p className="text-xs text-[#6E645C] mt-1">
-            Preencha os dados em 5 passos para gerar uma apresentação de alto padrão com link público e PDF.
-          </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => {
               handleSalvarProposta('rascunho');
               alert('Rascunho salvo com sucesso!');
             }}
-            className="px-4 py-2 bg-white border border-[#E8E2D9] hover:bg-[#FAF8F5] text-[#231B15] text-xs font-semibold rounded-xl transition-colors shadow-sm"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-white border border-[#E8E2D9] hover:bg-[#FAF8F5] text-[#231B15] text-xs font-semibold rounded-xl transition-colors shadow-sm text-center"
           >
             Salvar Rascunho
           </button>
           <button
             type="button"
             onClick={handleSalvarERevisar}
-            className="flex items-center space-x-1.5 px-5 py-2 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] text-xs font-bold rounded-xl shadow-gold-glow transition-all"
+            className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-4 sm:px-5 py-2 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] text-xs font-bold rounded-xl shadow-gold-glow transition-all whitespace-nowrap"
           >
             <Eye size={15} />
-            <span>Prévia do Documento</span>
+            <span>Prévia</span>
           </button>
         </div>
       </div>
 
       {/* Stepper Progress Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-[#E8E2D9] shadow-sm">
-        <div className="grid grid-cols-5 gap-2">
+      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-[#E8E2D9] shadow-sm">
+        {/* Stepper Desktop */}
+        <div className="hidden sm:grid grid-cols-5 gap-2">
           {stepsList.map((s) => {
             const isCompleted = step > s.num;
             const isCurrent = step === s.num;
@@ -517,11 +522,46 @@ export const CriadorPropostaPage: React.FC = () => {
                   >
                     {isCompleted ? '✓' : s.num}
                   </span>
-                  <span className="text-[11px] font-medium hidden sm:inline">{s.title}</span>
+                  <span className="text-[11px] font-medium">{s.title}</span>
                 </div>
               </button>
             );
           })}
+        </div>
+
+        {/* Stepper Mobile Compacto */}
+        <div className="sm:hidden space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#1B1410]">
+              Passo {step} de 5: <span className="text-[#C5A265] font-semibold">{stepsList[step - 1].title}</span>
+            </span>
+            <div className="flex items-center space-x-1">
+              {stepsList.map((s) => (
+                <button
+                  key={s.num}
+                  type="button"
+                  onClick={() => setStep(s.num)}
+                  aria-label={`Ir para etapa ${s.num}`}
+                  className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center transition-all ${
+                    step === s.num
+                      ? 'bg-[#C5A265] text-[#1B1410]'
+                      : step > s.num
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-[#FAF8F5] text-[#9B9087] border border-[#E8E2D9]'
+                  }`}
+                >
+                  {step > s.num ? '✓' : s.num}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Barra de progresso visual */}
+          <div className="w-full bg-[#E8E2D9] h-1.5 rounded-full overflow-hidden">
+            <div
+              className="bg-[#C5A265] h-full transition-all duration-300"
+              style={{ width: `${(step / 5) * 100}%` }}
+            />
+          </div>
         </div>
       </div>
 
@@ -530,8 +570,7 @@ export const CriadorPropostaPage: React.FC = () => {
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-6">
           <div className="border-b border-[#E8E2D9] pb-4 flex items-center justify-between">
             <div>
-              <h2 className="font-sans text-lg font-semibold text-[#1B1410]">Etapa 1 — Cliente & Dados do Projeto</h2>
-              <p className="text-xs text-[#6E645C] mt-0.5">Selecione o cliente existente ou cadastre um novo sem sair desta tela.</p>
+              <h2 className="font-sans text-lg font-semibold text-[#1B1410]">Cliente e Projeto</h2>
             </div>
             <button
               type="button"
@@ -643,10 +682,7 @@ export const CriadorPropostaPage: React.FC = () => {
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="font-sans text-lg font-semibold text-[#1B1410]">Etapa 2 — Ambientes & Renderizações 3D</h2>
-              <p className="text-xs text-[#6E645C] mt-0.5">
-                Adicione os cômodos do projeto, descrições detalhadas e fotos/renders 3D de alta qualidade.
-              </p>
+              <h2 className="font-sans text-lg font-semibold text-[#1B1410]">Ambientes e Projetos 3D</h2>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -787,14 +823,11 @@ export const CriadorPropostaPage: React.FC = () => {
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="font-sans text-lg font-semibold text-[#1B1410]">Etapa 3 — Itens, Módulos & Cálculos</h2>
-              <p className="text-xs text-[#6E645C] mt-0.5">
-                Discrimine os módulos e serviços de cada ambiente. Os subtotais e totais são calculados automaticamente.
-              </p>
+              <h2 className="font-sans text-lg font-semibold text-[#1B1410]">Itens e Módulos</h2>
             </div>
 
             <div className="flex items-center space-x-3 bg-[#FAF8F5] p-2.5 rounded-xl border border-[#E8E2D9] text-xs">
-              <span className="text-[#6E645C]">Exibir valor individual por ambiente no PDF:</span>
+              <span className="text-[#6E645C]">Discriminar valores por ambiente:</span>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
@@ -824,8 +857,8 @@ export const CriadorPropostaPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Tabela de Itens */}
-                <div className="overflow-x-auto">
+                {/* Tabela de Itens para Desktop */}
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-[#FAF8F5] border-b border-[#E8E2D9] text-[11px] font-semibold text-[#6E645C]">
@@ -892,6 +925,67 @@ export const CriadorPropostaPage: React.FC = () => {
                   </table>
                 </div>
 
+                {/* Cards de Itens para Mobile */}
+                <div className="md:hidden space-y-3">
+                  {amb.itens.map((item) => (
+                    <div key={item.id} className="p-3.5 bg-[#FAF8F5] rounded-2xl border border-[#E8E2D9] space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-semibold text-[#6E645C] uppercase">Descrição do Módulo</label>
+                        <button
+                          type="button"
+                          onClick={() => removerItem(amb.id, item.id)}
+                          className="p-1 text-red-500 hover:text-red-700"
+                          title="Remover Item"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={item.descricao}
+                        onChange={(e) => atualizarItem(amb.id, item.id, { descricao: e.target.value })}
+                        placeholder="Descrição do móvel ou serviço"
+                        className="w-full px-3 py-2 bg-white border border-[#E8E2D9] rounded-xl text-xs font-medium"
+                      />
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[10px] text-[#6E645C] block mb-0.5">Qtd</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantidade}
+                            onChange={(e) => atualizarItem(amb.id, item.id, { quantidade: Number(e.target.value) || 1 })}
+                            className="w-full px-2 py-1.5 bg-white border border-[#E8E2D9] rounded-xl text-xs text-center"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-[#6E645C] block mb-0.5">Unidade</label>
+                          <input
+                            type="text"
+                            value={item.unidade || 'cj'}
+                            onChange={(e) => atualizarItem(amb.id, item.id, { unidade: e.target.value })}
+                            className="w-full px-2 py-1.5 bg-white border border-[#E8E2D9] rounded-xl text-xs text-center uppercase"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-[#6E645C] block mb-0.5">Unitário (R$)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.valorUnitario}
+                            onChange={(e) => atualizarItem(amb.id, item.id, { valorUnitario: Number(e.target.value) || 0 })}
+                            className="w-full px-2 py-1.5 bg-white border border-[#E8E2D9] rounded-xl text-xs text-right font-medium"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-[#E8E2D9]/60">
+                        <span className="text-[11px] text-[#6E645C]">Total do Item:</span>
+                        <span className="text-xs font-bold text-[#1B1410]">{formatarMoeda(item.valorTotal)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 <div className="pt-2">
                   <button
                     type="button"
@@ -907,31 +1001,31 @@ export const CriadorPropostaPage: React.FC = () => {
           </div>
 
           {/* Resumo Financeiro da Etapa 3 */}
-          <div className="bg-[#1B1410] text-[#FAF8F5] p-6 rounded-3xl border border-[#2A1F19] shadow-premium-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="bg-[#1B1410] text-[#FAF8F5] p-5 sm:p-6 rounded-3xl border border-[#2A1F19] shadow-premium-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <span className="text-xs text-[#C5A265] uppercase tracking-wider font-semibold">Subtotal dos Ambientes</span>
-              <div className="text-2xl font-bold font-sans text-[#FAF8F5] mt-0.5">
+              <div className="text-xl sm:text-2xl font-bold font-sans text-[#FAF8F5] mt-0.5">
                 {formatarMoeda(valorTotalBrutoItens)}
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:space-x-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-[#2A1F19] w-full sm:w-auto">
+              <div className="w-full sm:w-auto text-left sm:text-right">
                 <label className="text-[11px] text-[#D9D2C7] block">Desconto Comercial Geral (R$)</label>
                 <input
                   type="number"
                   step="100"
                   value={descontoGeral}
                   onChange={(e) => setDescontoGeral(Number(e.target.value) || 0)}
-                  className="w-36 px-3 py-1.5 bg-[#2A1F19] border border-[#C5A265]/40 rounded-xl text-xs text-[#FAF8F5] text-right font-bold"
+                  className="w-full sm:w-36 px-3 py-1.5 bg-[#2A1F19] border border-[#C5A265]/40 rounded-xl text-xs text-[#FAF8F5] text-left sm:text-right font-bold mt-1 sm:mt-0"
                 />
               </div>
 
-              <div className="h-10 w-px bg-[#2A1F19]" />
+              <div className="hidden sm:block h-10 w-px bg-[#2A1F19]" />
 
-              <div>
-                <span className="text-xs text-[#DFC28B] uppercase tracking-wider font-semibold">Valor Final Proposta</span>
-                <div className="text-2xl font-bold font-sans text-[#C5A265]">
+              <div className="w-full sm:w-auto flex items-center justify-between sm:block pt-1 sm:pt-0">
+                <span className="text-xs text-[#DFC28B] uppercase tracking-wider font-semibold">Valor Final Proposta:</span>
+                <div className="text-xl sm:text-2xl font-bold font-sans text-[#C5A265]">
                   {formatarMoeda(valorFinal)}
                 </div>
               </div>
@@ -944,10 +1038,7 @@ export const CriadorPropostaPage: React.FC = () => {
       {step === 4 && (
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
-            <h2 className="font-sans text-lg font-semibold text-[#1B1410]">Etapa 4 — Condições Comerciais & Pagamento</h2>
-            <p className="text-xs text-[#6E645C] mt-0.5">
-              Defina formas de pagamento, cálculo automático de parcelas com ajuste fino manual, prazos e garantias.
-            </p>
+            <h2 className="font-sans text-lg font-semibold text-[#1B1410]">Condições Comerciais e Pagamento</h2>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1117,15 +1208,12 @@ export const CriadorPropostaPage: React.FC = () => {
       {step === 5 && (
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-6">
           <div className="border-b border-[#E8E2D9] pb-4">
-            <h2 className="font-sans text-lg font-semibold text-[#1B1410]">Etapa 5 — Revisão da Proposta Comercial</h2>
-            <p className="text-xs text-[#6E645C] mt-0.5">
-              Revise o resumo antes de compartilhar o link do cliente ou gerar o PDF de apresentação.
-            </p>
+            <h2 className="font-sans text-lg font-semibold text-[#1B1410]">Revisão da Proposta</h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-[#E8E2D9]">
-              <span className="text-[#6E645C] block">Cliente & Obra</span>
+              <span className="text-[#6E645C] block">Cliente</span>
               <div className="font-semibold text-[#1B1410] text-sm mt-1">
                 {clientes.find(c => c.id === clienteId)?.nome}
               </div>
@@ -1133,7 +1221,7 @@ export const CriadorPropostaPage: React.FC = () => {
             </div>
 
             <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-[#E8E2D9]">
-              <span className="text-[#6E645C] block">Ambientes Inclusos</span>
+              <span className="text-[#6E645C] block">Ambientes</span>
               <div className="font-semibold text-[#1B1410] text-sm mt-1">
                 {ambientes.length} ambientes
               </div>
@@ -1143,7 +1231,7 @@ export const CriadorPropostaPage: React.FC = () => {
             </div>
 
             <div className="p-4 bg-[#FAF3E8] rounded-2xl border border-[#C5A265]/40">
-              <span className="text-[#9E7E45] font-semibold block">Investimento Total</span>
+              <span className="text-[#9E7E45] font-semibold block">Valor Total</span>
               <div className="font-sans font-bold text-xl text-[#C5A265] mt-1">
                 {formatarMoeda(valorFinal)}
               </div>
@@ -1176,8 +1264,8 @@ export const CriadorPropostaPage: React.FC = () => {
         </div>
       )}
 
-      {/* Navegação Inferior entre Passos */}
-      <div className="flex items-center justify-between pt-4 border-t border-[#E8E2D9]">
+      {/* Navegação Inferior Desktop / Inline */}
+      <div className="hidden sm:flex items-center justify-between pt-4 border-t border-[#E8E2D9]">
         <button
           type="button"
           onClick={() => setStep(Math.max(1, step - 1))}
@@ -1213,13 +1301,56 @@ export const CriadorPropostaPage: React.FC = () => {
         )}
       </div>
 
-      {/* Modal Cadastro Rápido de Cliente */}
+      {/* Sticky Bottom Action Bar Mobile (Fixa no polegar acima da bottom bar) */}
+      <div className="sm:hidden fixed bottom-16 inset-x-0 z-30 bg-[#1B1410]/95 backdrop-blur-md border-t border-[#2A1F19] px-4 py-2.5 flex items-center justify-between shadow-2xl">
+        <div className="flex flex-col">
+          <span className="text-[10px] text-[#C5A265] font-semibold uppercase tracking-wider">Passo {step}/5 • Total</span>
+          <span className="text-xs font-bold text-[#FAF8F5]">{formatarMoeda(valorFinal)}</span>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          {step > 1 && (
+            <button
+              type="button"
+              onClick={() => setStep(step - 1)}
+              className="p-2 rounded-xl bg-[#2A1F19] text-[#FAF8F5] active:scale-95 transition-transform"
+              title="Voltar"
+            >
+              <ArrowLeft size={16} />
+            </button>
+          )}
+
+          {step < 5 ? (
+            <button
+              type="button"
+              onClick={() => setStep(step + 1)}
+              className="flex items-center space-x-1 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#9E7E45] to-[#C5A265] text-[#1B1410] text-xs font-bold shadow-sm active:scale-95 transition-transform"
+            >
+              <span>Avançar</span>
+              <ArrowRight size={14} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSalvarERevisar}
+              className="flex items-center space-x-1 px-3.5 py-2 rounded-xl bg-[#C5A265] text-[#1B1410] text-xs font-bold shadow-gold-glow active:scale-95 transition-transform"
+            >
+              <CheckCircle2 size={14} />
+              <span>Finalizar</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Modal Cadastro Rápido de Cliente em Formato Bottom Sheet Mobile */}
       {modalNovoClienteOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full border border-[#E8E2D9] shadow-premium-lg overflow-hidden p-6 space-y-4 text-xs">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full border border-[#E8E2D9] shadow-premium-lg overflow-hidden p-6 space-y-4 text-xs max-h-[85dvh] overflow-y-auto pb-safe">
+            {/* Alça visual de toque para mobile */}
+            <div className="sm:hidden w-10 h-1 bg-[#E8E2D9] rounded-full mx-auto -mt-2 mb-2" />
             <div className="flex items-center justify-between border-b border-[#E8E2D9] pb-3">
               <h3 className="font-sans text-base font-semibold text-[#1B1410]">Novo Cliente Rápido</h3>
-              <button onClick={() => setModalNovoClienteOpen(false)} className="text-[#9B9087] hover:text-[#231B15]">
+              <button onClick={() => setModalNovoClienteOpen(false)} className="text-[#9B9087] hover:text-[#231B15] p-1">
                 <X size={18} />
               </button>
             </div>

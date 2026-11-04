@@ -14,25 +14,55 @@ import {
   Search,
   Eye,
   MessageCircle,
-  Clock
+  Clock,
+  Trash2
 } from 'lucide-react';
 import { AlvesStore } from '../services/alvesStore';
+import { StatusBadge } from '../components/StatusBadge';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { Proposta, Contrato } from '../types/alves';
 
 export const VisaoGeralPage: React.FC = () => {
   const [propostas, setPropostas] = useState<Proposta[]>([]);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [busca, setBusca] = useState('');
+  const [propostaParaExcluir, setPropostaParaExcluir] = useState<{ id: string; numero: string } | null>(null);
+  const [loadingDelete, setLoadingDelete] = useState(false);
+
+  const carregarDados = async () => {
+    try {
+      const [props, conts] = await Promise.all([AlvesStore.getPropostas(), AlvesStore.getContratos()]);
+      setPropostas(props);
+      setContratos(conts);
+    } catch (error) {
+      console.error('Erro ao carregar painel Alves:', error);
+    }
+  };
 
   useEffect(() => {
-    let active = true;
-    Promise.all([AlvesStore.getPropostas(), AlvesStore.getContratos()])
-      .then(([propostas, contratos]) => {
-        if (active) { setPropostas(propostas); setContratos(contratos); }
-      })
-      .catch((error) => console.error('Erro ao carregar painel Alves:', error));
-    return () => { active = false; };
+    carregarDados();
   }, []);
+
+  const handleAbrirConfirmacaoExclusao = (id: string, numero: string) => {
+    setPropostaParaExcluir({ id, numero });
+  };
+
+  const handleConfirmarExclusao = async () => {
+    if (!propostaParaExcluir) return;
+    setLoadingDelete(true);
+    try {
+      await AlvesStore.deleteProposta(propostaParaExcluir.id);
+      // Atualização otimista imediata na tela
+      setPropostas(prev => prev.filter(p => p.id !== propostaParaExcluir.id));
+      setPropostaParaExcluir(null);
+      await carregarDados();
+    } catch (error: any) {
+      console.error('Erro ao excluir proposta:', error);
+      alert(error?.message || 'Não foi possível excluir a proposta.');
+    } finally {
+      setLoadingDelete(false);
+    }
+  };
 
   // Indicadores
   const totalPropostas = propostas.length;
@@ -55,190 +85,115 @@ export const VisaoGeralPage: React.FC = () => {
     );
   });
 
-  const getStatusBadge = (status: Proposta['status']) => {
-    switch (status) {
-      case 'rascunho':
-        return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5" />
-            Em Elaboração
-          </span>
-        );
-      case 'enviada':
-        return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5" />
-            Enviada ao Cliente
-          </span>
-        );
-      case 'aprovada':
-        return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5" />
-            Proposta Aprovada
-          </span>
-        );
-      case 'solicitou_ajuste':
-        return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-800 border border-purple-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5" />
-            Ajustes Solicitados
-          </span>
-        );
-      case 'contrato_gerado':
-        return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[#FAF3E8] text-[#9E7E45] border border-[#C5A265]/40 font-semibold">
-            <Award size={13} className="mr-1 text-[#C5A265]" />
-            Contrato Gerado
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-            {status}
-          </span>
-        );
-    }
-  };
-
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
   };
 
   return (
     <div className="space-y-8 animate-fadeIn">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[#1B1410] via-[#2A1F19] to-[#1B1410] text-[#FAF8F5] rounded-3xl p-6 sm:p-8 border border-[#382B23] shadow-premium-lg flex flex-col md:flex-row md:items-center md:justify-between gap-6 relative overflow-hidden">
-        {/* Subtle glow background element */}
-        <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-[#C5A265]/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="space-y-2 max-w-2xl">
-          <div className="inline-flex items-center space-x-2 bg-[#C5A265]/20 text-[#DFC28B] px-3 py-1 rounded-full text-xs font-medium border border-[#C5A265]/30">
-            <Award size={14} className="text-[#C5A265]" />
-            <span>Sistema Exclusivo de Propostas & Contratos</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-sans font-semibold text-[#FAF8F5]">
-            Painel Executivo Alves Planejados
+      {/* Header Banner Sóbrio e Limpo */}
+      <div className="bg-[#1B1410] text-[#FAF8F5] rounded-2xl p-5 sm:p-6 border border-[#2A1F19] shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-sans font-semibold text-[#FAF8F5]">
+            Visão Geral
           </h1>
-          <p className="text-sm text-[#D9D2C7] leading-relaxed">
-            Acompanhe o ciclo completo de orçamentos, aprovações de clientes e contratos prontos para assinatura.
+          <p className="text-xs text-[#8C7D73] mt-0.5">
+            Orçamentos, aprovações e contratos da marcenaria.
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
           <Link
             to="/propostas/nova"
-            className="flex items-center justify-center space-x-2 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] font-semibold px-5 py-3.5 rounded-xl shadow-gold-glow transition-all duration-200 transform hover:-translate-y-0.5 text-sm"
+            className="flex items-center justify-center space-x-1.5 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] font-semibold px-4 py-2.5 rounded-xl transition-all text-xs"
           >
-            <PlusCircle size={18} />
-            <span>+ Nova Proposta</span>
+            <PlusCircle size={16} />
+            <span>Nova Proposta</span>
           </Link>
           <Link
             to="/clientes"
-            className="flex items-center justify-center space-x-2 bg-[#2A1F19] hover:bg-[#382B23] text-[#FAF8F5] font-medium px-4 py-3.5 rounded-xl border border-[#382B23] transition-colors text-sm"
+            className="flex items-center justify-center space-x-1.5 bg-[#2A1F19] hover:bg-[#382B23] text-[#FAF8F5] font-medium px-4 py-2.5 rounded-xl border border-[#382B23] transition-colors text-xs"
           >
             <span>Gerenciar Clientes</span>
           </Link>
         </div>
       </div>
 
-      {/* 6 Indicadores Principais */}
+      {/* 6 Indicadores Principais com suporte a Snap Horizontal no Mobile */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-[#231B15] flex items-center space-x-2">
-            <span>Indicadores Comerciais</span>
-            <span className="text-xs font-normal text-[#6E645C] bg-[#F2EFEB] px-2.5 py-0.5 rounded-full">
-              Tempo Real
-            </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-3">
+          <h2 className="text-sm sm:text-base font-semibold text-[#231B15]">
+            Resumo Comercial
           </h2>
-          <div className="text-xs text-[#6E645C] font-medium">
-            Volume Aprovado: <span className="text-[#1B1410] font-bold">{formatarMoeda(valorTotalAprovado)}</span>
+          <div className="text-xs text-[#6E645C] font-medium flex items-center justify-between sm:justify-end gap-2">
+            <span>Aprovado:</span>
+            <span className="text-[#1B1410] font-bold text-sm text-[#C5A265]">{formatarMoeda(valorTotalAprovado)}</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        {/* Carrossel tátil no mobile com snap horizontal e grade no desktop */}
+        <div className="flex sm:grid sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-4 overflow-x-auto pb-2 sm:pb-0 snap-x snap-mandatory no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
           {/* Total de Propostas */}
-          <div className="bg-white p-4 rounded-2xl border border-[#E8E2D9] shadow-sm hover:border-[#C5A265]/50 transition-all">
-            <div className="flex items-center justify-between text-[#6E645C] mb-2">
-              <span className="text-xs font-medium">Total Propostas</span>
-              <div className="p-2 bg-[#FAF8F5] rounded-xl text-[#231B15]">
-                <FileText size={16} />
-              </div>
+          <div className="min-w-[130px] sm:min-w-0 flex-1 snap-start bg-white p-3.5 rounded-xl border border-[#E8E2D9] shadow-sm">
+            <div className="flex items-center justify-between text-[#6E645C] mb-1">
+              <span className="text-xs font-medium">Total</span>
+              <FileText size={14} className="text-[#9B9087]" />
             </div>
-            <div className="text-2xl font-bold text-[#1B1410]">{totalPropostas}</div>
-            <div className="text-[11px] text-[#9B9087] mt-1">Todos os registros</div>
+            <div className="text-xl font-bold text-[#1B1410]">{totalPropostas}</div>
           </div>
 
           {/* Em Elaboração */}
-          <div className="bg-white p-4 rounded-2xl border border-[#E8E2D9] shadow-sm hover:border-[#C5A265]/50 transition-all">
-            <div className="flex items-center justify-between text-[#6E645C] mb-2">
-              <span className="text-xs font-medium">Em Elaboração</span>
-              <div className="p-2 bg-amber-50 rounded-xl text-amber-700">
-                <FileClock size={16} />
-              </div>
+          <div className="min-w-[130px] sm:min-w-0 flex-1 snap-start bg-white p-3.5 rounded-xl border border-[#E8E2D9] shadow-sm">
+            <div className="flex items-center justify-between text-[#6E645C] mb-1">
+              <span className="text-xs font-medium">Rascunhos</span>
+              <FileClock size={14} className="text-amber-700" />
             </div>
-            <div className="text-2xl font-bold text-amber-900">{propostasElaboracao}</div>
-            <div className="text-[11px] text-[#9B9087] mt-1">Rascunhos abertos</div>
+            <div className="text-xl font-bold text-amber-900">{propostasElaboracao}</div>
           </div>
 
           {/* Enviadas */}
-          <div className="bg-white p-4 rounded-2xl border border-[#E8E2D9] shadow-sm hover:border-[#C5A265]/50 transition-all">
-            <div className="flex items-center justify-between text-[#6E645C] mb-2">
+          <div className="min-w-[130px] sm:min-w-0 flex-1 snap-start bg-white p-3.5 rounded-xl border border-[#E8E2D9] shadow-sm">
+            <div className="flex items-center justify-between text-[#6E645C] mb-1">
               <span className="text-xs font-medium">Enviadas</span>
-              <div className="p-2 bg-blue-50 rounded-xl text-blue-700">
-                <Send size={16} />
-              </div>
+              <Send size={14} className="text-blue-700" />
             </div>
-            <div className="text-2xl font-bold text-blue-900">{propostasEnviadas}</div>
-            <div className="text-[11px] text-[#9B9087] mt-1">Aguardando cliente</div>
+            <div className="text-xl font-bold text-blue-900">{propostasEnviadas}</div>
           </div>
 
           {/* Aprovadas */}
-          <div className="bg-white p-4 rounded-2xl border border-[#E8E2D9] shadow-sm hover:border-emerald-300 transition-all">
-            <div className="flex items-center justify-between text-[#6E645C] mb-2">
+          <div className="min-w-[130px] sm:min-w-0 flex-1 snap-start bg-white p-3.5 rounded-xl border border-[#E8E2D9] shadow-sm">
+            <div className="flex items-center justify-between text-[#6E645C] mb-1">
               <span className="text-xs font-medium">Aprovadas</span>
-              <div className="p-2 bg-emerald-50 rounded-xl text-emerald-700">
-                <CheckCircle2 size={16} />
-              </div>
+              <CheckCircle2 size={14} className="text-emerald-700" />
             </div>
-            <div className="text-2xl font-bold text-emerald-900">{propostasAprovadas}</div>
-            <div className="text-[11px] text-emerald-700 font-medium mt-1">Prontas p/ contrato</div>
+            <div className="text-xl font-bold text-emerald-900">{propostasAprovadas}</div>
           </div>
 
           {/* Contratos Aguardando */}
-          <div className="bg-white p-4 rounded-2xl border border-[#E8E2D9] shadow-sm hover:border-[#C5A265]/50 transition-all">
-            <div className="flex items-center justify-between text-[#6E645C] mb-2">
-              <span className="text-xs font-medium">Ctr. Pendentes</span>
-              <div className="p-2 bg-[#FAF3E8] rounded-xl text-[#9E7E45]">
-                <FileCheck2 size={16} />
-              </div>
+          <div className="min-w-[130px] sm:min-w-0 flex-1 snap-start bg-white p-3.5 rounded-xl border border-[#E8E2D9] shadow-sm">
+            <div className="flex items-center justify-between text-[#6E645C] mb-1">
+              <span className="text-xs font-medium">Contratos</span>
+              <FileCheck2 size={14} className="text-[#9E7E45]" />
             </div>
-            <div className="text-2xl font-bold text-[#231B15]">{contratosAguardando}</div>
-            <div className="text-[11px] text-[#9B9087] mt-1">Pendente assinatura</div>
+            <div className="text-xl font-bold text-[#231B15]">{contratosAguardando}</div>
           </div>
 
           {/* Contratos Assinados */}
-          <div className="bg-gradient-to-br from-[#1B1410] to-[#2A1F19] text-[#FAF8F5] p-4 rounded-2xl border border-[#C5A265]/40 shadow-sm transition-all">
-            <div className="flex items-center justify-between text-[#D9D2C7] mb-2">
+          <div className="min-w-[130px] sm:min-w-0 flex-1 snap-start bg-[#1B1410] text-[#FAF8F5] p-3.5 rounded-xl border border-[#C5A265]/30 shadow-sm">
+            <div className="flex items-center justify-between text-[#D9D2C7] mb-1">
               <span className="text-xs font-medium">Assinados</span>
-              <div className="p-2 bg-[#C5A265]/20 rounded-xl text-[#DFC28B]">
-                <Award size={16} />
-              </div>
+              <Award size={14} className="text-[#C5A265]" />
             </div>
-            <div className="text-2xl font-bold text-[#FAF8F5]">{contratosAssinados}</div>
-            <div className="text-[11px] text-[#C5A265] mt-1 font-medium">Fechamento total</div>
+            <div className="text-xl font-bold text-[#FAF8F5]">{contratosAssinados}</div>
           </div>
         </div>
       </div>
 
       {/* Tabela de Propostas Recentes */}
       <div className="bg-white rounded-2xl border border-[#E8E2D9] shadow-sm overflow-hidden">
-        <div className="p-5 sm:p-6 border-b border-[#E8E2D9] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-4 sm:p-5 border-b border-[#E8E2D9] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="font-sans text-lg font-semibold text-[#231B15]">Propostas Recentes</h3>
-            <p className="text-xs text-[#6E645C] mt-0.5">
-              Consulte e acesse rapidamente as propostas comerciais geradas no sistema
-            </p>
+            <h3 className="font-sans text-base font-semibold text-[#231B15]">Propostas Recentes</h3>
           </div>
 
           <div className="flex items-center space-x-3">
@@ -262,7 +217,8 @@ export const VisaoGeralPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Visualização em Tabela para Telas Grandes (Full Desktop) */}
+        <div className="hidden xl:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#FAF8F5] border-b border-[#E8E2D9] text-[11px] font-semibold text-[#6E645C] uppercase tracking-wider">
@@ -308,7 +264,7 @@ export const VisaoGeralPage: React.FC = () => {
                       )}
                     </td>
                     <td className="py-4 px-5">
-                      {getStatusBadge(p.status)}
+                      <StatusBadge status={p.status} />
                     </td>
                     <td className="py-4 px-5 text-[#6E645C]">
                       {new Date(p.dataEmissao).toLocaleDateString('pt-BR')}
@@ -337,6 +293,13 @@ export const VisaoGeralPage: React.FC = () => {
                         >
                           Editar
                         </Link>
+                        <button
+                          onClick={() => handleAbrirConfirmacaoExclusao(p.id, p.numero)}
+                          title="Excluir Proposta"
+                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -345,7 +308,89 @@ export const VisaoGeralPage: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Visualização em Cards para Mobile, Tablet e Telas Médias */}
+        <div className="xl:hidden divide-y divide-[#E8E2D9]">
+          {propostasFiltradas.length === 0 ? (
+            <div className="py-8 text-center text-xs text-[#9B9087]">
+              Nenhuma proposta encontrada.
+            </div>
+          ) : (
+            propostasFiltradas.slice(0, 5).map((p) => (
+              <div key={p.id} className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-xs text-[#1B1410]">{p.numero}</span>
+                    <span className="text-[10px] text-[#9B9087] ml-1.5">(V{p.versao})</span>
+                  </div>
+                  <StatusBadge status={p.status} size="sm" />
+                </div>
+
+                <div>
+                  <div className="text-sm font-bold text-[#1B1410]">{p.cliente.nome}</div>
+                  <div className="text-xs text-[#6E645C] truncate">{p.nomeProjeto}</div>
+                  <div className="text-[11px] text-[#9B9087] mt-0.5 truncate">
+                    {p.ambientes.map(a => a.nome).join(', ')}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <div className="text-xs text-[#9B9087]">Valor Final</div>
+                    <div className="text-sm font-bold text-[#C5A265]">{formatarMoeda(p.condicoes.valorFinal)}</div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Link
+                      to={`/p/${p.publicToken}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-[#C5A265] bg-[#FAF3E8] rounded-xl border border-[#C5A265]/40"
+                      title="Link Público"
+                    >
+                      <ExternalLink size={15} />
+                    </Link>
+                    <Link
+                      to={`/propostas/${p.id}/previa`}
+                      className="px-3 py-1.5 bg-[#1B1410] text-[#FAF8F5] text-xs font-semibold rounded-xl flex items-center space-x-1"
+                    >
+                      <Eye size={13} className="text-[#C5A265]" />
+                      <span>Ver</span>
+                    </Link>
+                    <Link
+                      to={`/propostas/${p.id}/editar`}
+                      className="px-2.5 py-1.5 bg-[#FAF8F5] text-[#1B1410] text-xs font-medium rounded-xl border border-[#E8E2D9]"
+                    >
+                      Editar
+                    </Link>
+                    <button
+                      onClick={() => handleAbrirConfirmacaoExclusao(p.id, p.numero)}
+                      className="p-2 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl border border-red-200 transition-colors"
+                      title="Excluir Proposta"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
+
+      {/* Modal Moderno de Confirmação de Exclusão */}
+      <ConfirmModal
+        isOpen={Boolean(propostaParaExcluir)}
+        title="Excluir Proposta"
+        message={`Deseja realmente excluir a proposta ${propostaParaExcluir?.numero || ''}? Esta ação é permanente.`}
+        confirmLabel="Sim, Excluir"
+        cancelLabel="Cancelar"
+        variant="danger"
+        loading={loadingDelete}
+        onConfirm={handleConfirmarExclusao}
+        onCancel={() => {
+          if (!loadingDelete) setPropostaParaExcluir(null);
+        }}
+      />
     </div>
   );
 };

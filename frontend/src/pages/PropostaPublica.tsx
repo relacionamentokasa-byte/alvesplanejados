@@ -7,16 +7,19 @@ import {
   ShieldCheck,
   Calendar,
   Layers,
-  Sparkles,
   Phone,
   MessageSquare,
   Building,
   Check,
   X,
   FileCheck,
-  Printer
+  Printer,
+  Maximize2,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { BrandMark } from '../components/BrandMark';
+import { ImageLightbox, LightboxImage } from '../components/ImageLightbox';
 import { AlvesStore } from '../services/alvesStore';
 import { Proposta, ConfiguracoesEmpresa } from '../types/alves';
 
@@ -33,6 +36,38 @@ export const PropostaPublicaPage: React.FC = () => {
   const [observacaoAprovacao, setObservacaoAprovacao] = useState('');
   const [observacaoAjuste, setObservacaoAjuste] = useState('');
   const [sucessoMensagem, setSucessoMensagem] = useState<string | null>(null);
+
+  // Modo Apresentação Escura
+  const [modoEscuro, setModoEscuro] = useState(() => {
+    return localStorage.getItem('alves_modo_apresentacao') === 'dark';
+  });
+
+  const toggleModoEscuro = () => {
+    setModoEscuro((prev) => {
+      const next = !prev;
+      localStorage.setItem('alves_modo_apresentacao', next ? 'dark' : 'light');
+      return next;
+    });
+  };
+
+  // Estado da Galeria Lightbox 3D
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxImages, setLightboxImages] = useState<LightboxImage[]>([]);
+
+  const handleAbrirLightbox = (imagensAmbiente: { id: string; url: string; nome: string }[], imagemSelecionadaId: string, nomeAmbiente: string) => {
+    // Monta lista de imagens com o contexto do ambiente
+    const formatadas: LightboxImage[] = imagensAmbiente.map(img => ({
+      id: img.id,
+      url: img.url,
+      nome: img.nome,
+      ambienteNome: nomeAmbiente
+    }));
+    setLightboxImages(formatadas);
+    const index = formatadas.findIndex(img => img.id === imagemSelecionadaId);
+    setLightboxIndex(index >= 0 ? index : 0);
+    setLightboxOpen(true);
+  };
 
   useEffect(() => {
     if (!token) {
@@ -136,7 +171,11 @@ export const PropostaPublicaPage: React.FC = () => {
   const isAprovada = proposta.status === 'aprovada' || proposta.status === 'contrato_gerado';
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] text-[#231B15] font-sans pb-24 selection:bg-[#C5A265]/30">
+    <div
+      className={`min-h-screen transition-colors duration-300 font-sans pb-24 selection:bg-[#C5A265]/30 ${
+        modoEscuro ? 'bg-[#0F0C0A] text-[#FAF8F5]' : 'bg-[#FAF8F5] text-[#231B15]'
+      }`}
+    >
       {/* Top Header Barra do Cliente */}
       <header className="bg-[#1B1410] text-[#FAF8F5] px-4 sm:px-8 py-4 border-b border-[#2A1F19] sticky top-0 z-30 shadow-md">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -149,6 +188,23 @@ export const PropostaPublicaPage: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-2 sm:space-x-3 text-xs">
+            {/* Toggle Modo Apresentação */}
+            <button
+              type="button"
+              onClick={toggleModoEscuro}
+              className={`px-3 py-1.5 rounded-xl border flex items-center space-x-1.5 transition-all text-xs font-semibold ${
+                modoEscuro
+                  ? 'bg-[#C5A265] text-[#1B1410] border-[#DFC28B] shadow-gold-glow'
+                  : 'bg-[#2A1F19] text-[#D9D2C7] hover:text-white border-[#382B23]'
+              }`}
+              title={modoEscuro ? 'Alternar para Modo Claro' : 'Ativar Modo Apresentação Escura'}
+            >
+              {modoEscuro ? <Sun size={13} /> : <Moon size={13} />}
+              <span className="hidden sm:inline">
+                {modoEscuro ? 'Modo Claro' : 'Modo Apresentação'}
+              </span>
+            </button>
+
             <button
               onClick={() => window.print()}
               className="px-3 py-1.5 bg-[#2A1F19] hover:bg-[#382B23] text-[#FAF8F5] rounded-xl border border-[#382B23] flex items-center space-x-1 transition-colors"
@@ -197,13 +253,16 @@ export const PropostaPublicaPage: React.FC = () => {
         )}
 
         {/* CAPA & APRESENTAÇÃO */}
-        <div className="bg-white rounded-3xl border border-[#E8E2D9] shadow-premium-lg overflow-hidden">
+        <div
+          className={`rounded-3xl border shadow-premium-lg overflow-hidden transition-colors duration-300 ${
+            modoEscuro ? 'bg-[#18120E] border-[#2E221B]' : 'bg-white border-[#E8E2D9]'
+          }`}
+        >
           {/* Header da Capa */}
           <div className="bg-gradient-to-b from-[#1B1410] via-[#241C18] to-[#1B1410] text-[#FAF8F5] p-8 sm:p-12 relative overflow-hidden border-b border-[#C5A265]/40">
             <div className="space-y-4 max-w-3xl">
               <div className="inline-flex items-center space-x-2 bg-[#C5A265]/20 text-[#DFC28B] px-3 py-1 rounded-full text-xs font-semibold border border-[#C5A265]/30">
-                <Sparkles size={13} />
-                <span>Proposta Exclusiva Sob Medida</span>
+                <span>Proposta Comercial</span>
               </div>
               <h1 className="font-brand text-2xl sm:text-4xl font-bold text-[#FAF8F5] leading-tight">
                 {proposta.nomeProjeto}
@@ -217,25 +276,45 @@ export const PropostaPublicaPage: React.FC = () => {
           </div>
 
           {/* Texto Institucional */}
-          <div className="p-6 sm:p-10 border-b border-[#E8E2D9] bg-[#FAF8F5]/60 text-xs sm:text-sm text-[#6E645C] leading-relaxed">
+          <div
+            className={`p-6 sm:p-10 border-b text-xs sm:text-sm leading-relaxed transition-colors duration-300 ${
+              modoEscuro
+                ? 'bg-[#1F1713] border-[#2E221B] text-[#D9D2C7]'
+                : 'bg-[#FAF8F5]/60 border-[#E8E2D9] text-[#6E645C]'
+            }`}
+          >
             {config.textoApresentacaoPadrao}
           </div>
 
           {/* AMBIENTES */}
           <div className="p-6 sm:p-10 space-y-10">
-            <h2 className="font-sans text-2xl font-bold text-[#1B1410] border-b border-[#E8E2D9] pb-3">
+            <h2
+              className={`font-sans text-2xl font-bold border-b pb-3 transition-colors duration-300 ${
+                modoEscuro ? 'text-[#FAF8F5] border-[#2E221B]' : 'text-[#1B1410] border-[#E8E2D9]'
+              }`}
+            >
               Ambientes do Projeto ({proposta.ambientes.length})
             </h2>
 
             <div className="space-y-10">
               {proposta.ambientes.map((amb, idx) => (
                 <div key={amb.id} className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-[#E8E2D9] pb-2">
+                  <div
+                    className={`flex items-center justify-between border-b pb-2 transition-colors duration-300 ${
+                      modoEscuro ? 'border-[#2E221B]' : 'border-[#E8E2D9]'
+                    }`}
+                  >
                     <div className="flex items-center space-x-2.5">
-                      <span className="w-7 h-7 rounded-xl bg-[#1B1410] text-[#C5A265] flex items-center justify-center font-bold text-xs">
+                      <span className="w-7 h-7 rounded-xl bg-[#1B1410] text-[#C5A265] border border-[#C5A265]/30 flex items-center justify-center font-bold text-xs">
                         0{idx + 1}
                       </span>
-                      <h3 className="font-sans text-lg font-bold text-[#1B1410]">{amb.nome}</h3>
+                      <h3
+                        className={`font-sans text-lg font-bold ${
+                          modoEscuro ? 'text-[#FAF8F5]' : 'text-[#1B1410]'
+                        }`}
+                      >
+                        {amb.nome}
+                      </h3>
                     </div>
                     {proposta.exibirValoresPorAmbiente && (
                       <span className="text-xs font-bold text-[#C5A265]">
@@ -244,16 +323,50 @@ export const PropostaPublicaPage: React.FC = () => {
                     )}
                   </div>
 
-                  <p className="text-xs sm:text-sm text-[#6E645C] leading-relaxed">{amb.descricao}</p>
+                  <p
+                    className={`text-xs sm:text-sm leading-relaxed ${
+                      modoEscuro ? 'text-[#B8ACA2]' : 'text-[#6E645C]'
+                    }`}
+                  >
+                    {amb.descricao}
+                  </p>
 
                   {/* Renders 3D */}
                   {amb.imagens && amb.imagens.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {amb.imagens.map((img) => (
-                        <div key={img.id} className="rounded-2xl overflow-hidden border border-[#E8E2D9] shadow-sm bg-black/5">
-                          <img src={img.url} alt={img.nome} className="w-full h-64 object-cover" />
-                          <div className="p-2.5 bg-[#FAF8F5] text-xs font-medium text-[#231B15] border-t border-[#E8E2D9]">
-                            {img.nome}
+                        <div
+                          key={img.id}
+                          onClick={() => handleAbrirLightbox(amb.imagens, img.id, amb.nome)}
+                          className={`group relative rounded-2xl overflow-hidden border shadow-sm cursor-pointer hover:border-[#C5A265] transition-all ${
+                            modoEscuro
+                              ? 'border-[#382B23] bg-black/40 hover:shadow-gold-glow'
+                              : 'border-[#E8E2D9] bg-black/5'
+                          }`}
+                        >
+                          <div className="relative h-64 overflow-hidden">
+                            <img
+                              src={img.url}
+                              alt={img.nome}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                            {/* Overlay sutil de ampliação no hover */}
+                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-[#1B1410]/90 text-[#DFC28B] text-xs font-semibold backdrop-blur-sm border border-[#C5A265]/40 shadow-lg">
+                                <Maximize2 size={13} />
+                                <span>Ampliar em Alta Resolução</span>
+                              </span>
+                            </div>
+                          </div>
+                          <div
+                            className={`p-2.5 text-xs font-medium border-t flex items-center justify-between transition-colors duration-300 ${
+                              modoEscuro
+                                ? 'bg-[#221813] text-[#FAF8F5] border-[#382B23]'
+                                : 'bg-[#FAF8F5] text-[#231B15] border-[#E8E2D9]'
+                            }`}
+                          >
+                            <span className="truncate">{img.nome}</span>
+                            <span className="text-[10px] text-[#C5A265] font-semibold group-hover:underline">Toque para ver</span>
                           </div>
                         </div>
                       ))}
@@ -261,11 +374,25 @@ export const PropostaPublicaPage: React.FC = () => {
                   )}
 
                   {/* Especificações */}
-                  <div className="bg-[#FAF8F5] p-4 rounded-2xl border border-[#E8E2D9] text-xs space-y-1.5">
-                    <span className="font-semibold text-[#1B1410] block text-[11px] uppercase tracking-wider">
+                  <div
+                    className={`p-4 rounded-2xl border text-xs space-y-1.5 transition-colors duration-300 ${
+                      modoEscuro
+                        ? 'bg-[#1F1713] border-[#2E221B]'
+                        : 'bg-[#FAF8F5] border-[#E8E2D9]'
+                    }`}
+                  >
+                    <span
+                      className={`font-semibold block text-[11px] uppercase tracking-wider ${
+                        modoEscuro ? 'text-[#DFC28B]' : 'text-[#1B1410]'
+                      }`}
+                    >
                       Módulos e Especificações:
                     </span>
-                    <ul className="space-y-1 text-[#6E645C]">
+                    <ul
+                      className={`space-y-1 ${
+                        modoEscuro ? 'text-[#B8ACA2]' : 'text-[#6E645C]'
+                      }`}
+                    >
                       {amb.itens.map(it => (
                         <li key={it.id} className="flex items-center justify-between py-1">
                           <span className="flex items-center space-x-2">
@@ -273,7 +400,13 @@ export const PropostaPublicaPage: React.FC = () => {
                             <span>{it.descricao} ({it.quantidade} {it.unidade})</span>
                           </span>
                           {proposta.exibirValoresPorAmbiente && (
-                            <span className="font-semibold text-[#1B1410]">{formatarMoeda(it.valorTotal)}</span>
+                            <span
+                              className={`font-semibold ${
+                                modoEscuro ? 'text-[#FAF8F5]' : 'text-[#1B1410]'
+                              }`}
+                            >
+                              {formatarMoeda(it.valorTotal)}
+                            </span>
                           )}
                         </li>
                       ))}
@@ -285,8 +418,20 @@ export const PropostaPublicaPage: React.FC = () => {
           </div>
 
           {/* INVESTIMENTO & CONDIÇÕES */}
-          <div className="p-6 sm:p-10 bg-[#FAF8F5]/80 border-t border-[#E8E2D9] space-y-6">
-            <h2 className="font-sans text-2xl font-bold text-[#1B1410]">Investimento & Pagamento</h2>
+          <div
+            className={`p-6 sm:p-10 border-t space-y-6 transition-colors duration-300 ${
+              modoEscuro
+                ? 'bg-[#1F1713] border-[#2E221B]'
+                : 'bg-[#FAF8F5]/80 border-[#E8E2D9]'
+            }`}
+          >
+            <h2
+              className={`font-sans text-2xl font-bold ${
+                modoEscuro ? 'text-[#FAF8F5]' : 'text-[#1B1410]'
+              }`}
+            >
+              Investimento & Pagamento
+            </h2>
 
             {/* Total */}
             <div className="bg-gradient-to-r from-[#1B1410] to-[#2A1F19] text-[#FAF8F5] p-6 sm:p-8 rounded-3xl border border-[#C5A265]/40 shadow-premium flex flex-col sm:flex-row sm:items-center justify-between gap-6">
@@ -305,31 +450,62 @@ export const PropostaPublicaPage: React.FC = () => {
             </div>
 
             {/* Parcelas */}
-            <div className="bg-white p-5 rounded-2xl border border-[#E8E2D9] space-y-3">
-              <h4 className="font-semibold text-xs text-[#1B1410] uppercase tracking-wider">Cronograma de Pagamento:</h4>
+            <div
+              className={`p-5 rounded-2xl border space-y-3 transition-colors duration-300 ${
+                modoEscuro ? 'bg-[#18120E] border-[#2E221B]' : 'bg-white border-[#E8E2D9]'
+              }`}
+            >
+              <h4
+                className={`font-semibold text-xs uppercase tracking-wider ${
+                  modoEscuro ? 'text-[#DFC28B]' : 'text-[#1B1410]'
+                }`}
+              >
+                Cronograma de Pagamento:
+              </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                 {proposta.condicoes.parcelas.map(p => (
-                  <div key={p.numero} className="p-3 bg-[#FAF8F5] rounded-xl border border-[#E8E2D9] text-xs">
+                  <div
+                    key={p.numero}
+                    className={`p-3 rounded-xl border text-xs transition-colors duration-300 ${
+                      modoEscuro
+                        ? 'bg-[#221813] border-[#382B23] text-[#FAF8F5]'
+                        : 'bg-[#FAF8F5] border-[#E8E2D9] text-[#231B15]'
+                    }`}
+                  >
                     <div className="flex items-center justify-between font-semibold">
                       <span>Parcela #{p.numero}</span>
                       <span className="text-[#C5A265] font-bold">{formatarMoeda(p.valor)}</span>
                     </div>
-                    <div className="text-[11px] text-[#6E645C] mt-0.5">{p.descricao}</div>
+                    <div
+                      className={`text-[11px] mt-0.5 ${
+                        modoEscuro ? 'text-[#A89A90]' : 'text-[#6E645C]'
+                      }`}
+                    >
+                      {p.descricao}
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* O que está incluso */}
-            <div className="bg-white p-5 rounded-2xl border border-[#E8E2D9] space-y-2 text-xs">
-              <h4 className="font-semibold text-emerald-800 flex items-center space-x-1.5">
+            <div
+              className={`p-5 rounded-2xl border space-y-2 text-xs transition-colors duration-300 ${
+                modoEscuro ? 'bg-[#18120E] border-[#2E221B]' : 'bg-white border-[#E8E2D9]'
+              }`}
+            >
+              <h4 className="font-semibold text-emerald-400 flex items-center space-x-1.5">
                 <CheckCircle2 size={14} />
                 <span>O que está incluso no seu projeto</span>
               </h4>
-              <ul className="space-y-1 text-[#6E645C]">
+              <ul
+                className={`space-y-1 ${
+                  modoEscuro ? 'text-[#B8ACA2]' : 'text-[#6E645C]'
+                }`}
+              >
                 {proposta.condicoes.incluso.map((inc, i) => (
                   <li key={i} className="flex items-start space-x-1.5">
-                    <span className="text-emerald-600 font-bold">•</span>
+                    <span className="text-emerald-400 font-bold">•</span>
                     <span>{inc}</span>
                   </li>
                 ))}
@@ -346,9 +522,9 @@ export const PropostaPublicaPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Action Bar for Client Approval (Bottom Fixed) */}
+      {/* Floating Action Bar for Client Approval (Bottom Fixed com Safe Area do iOS) */}
       {!isAprovada && (
-        <div className="fixed bottom-0 inset-x-0 bg-[#1B1410]/95 backdrop-blur-md border-t border-[#C5A265]/30 p-4 z-40 shadow-2xl">
+        <div className="fixed bottom-0 inset-x-0 bg-[#1B1410]/95 backdrop-blur-md border-t border-[#C5A265]/30 p-3 sm:p-4 pb-safe z-40 shadow-2xl">
           <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="text-center sm:text-left">
               <div className="text-xs text-[#FAF8F5] font-semibold">Deseja aprovar esta proposta comercial?</div>
@@ -357,11 +533,11 @@ export const PropostaPublicaPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center space-x-3 w-full sm:w-auto">
+            <div className="flex items-center space-x-2.5 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setModalAjusteOpen(true)}
-                className="flex-1 sm:flex-none px-4 py-2.5 bg-[#2A1F19] hover:bg-[#382B23] text-[#FAF8F5] text-xs font-semibold rounded-xl border border-[#382B23] transition-colors"
+                className="flex-1 sm:flex-none px-4 py-3 sm:py-2.5 bg-[#2A1F19] hover:bg-[#382B23] text-[#FAF8F5] text-xs font-semibold rounded-xl border border-[#382B23] transition-colors active:scale-95"
               >
                 Solicitar Ajuste
               </button>
@@ -369,7 +545,7 @@ export const PropostaPublicaPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setModalAprovarOpen(true)}
-                className="flex-1 sm:flex-none px-6 py-2.5 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] text-xs font-bold rounded-xl shadow-gold-glow transition-all flex items-center justify-center space-x-1.5"
+                className="flex-1 sm:flex-none px-6 py-3 sm:py-2.5 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] text-xs font-bold rounded-xl shadow-gold-glow transition-all flex items-center justify-center space-x-1.5 active:scale-95"
               >
                 <CheckCircle2 size={16} />
                 <span>APROVAR PROPOSTA</span>
@@ -379,10 +555,11 @@ export const PropostaPublicaPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal de Confirmação de Aprovação */}
+      {/* Modal de Confirmação de Aprovação (Bottom Sheet no Mobile) */}
       {modalAprovarOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full border border-[#E8E2D9] shadow-premium-lg overflow-hidden p-6 space-y-4 text-xs animate-scaleUp">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full border border-[#E8E2D9] shadow-premium-lg overflow-hidden p-6 space-y-4 text-xs animate-scaleUp max-h-[85dvh] overflow-y-auto pb-safe">
+            <div className="sm:hidden w-10 h-1 bg-[#E8E2D9] rounded-full mx-auto -mt-2 mb-2" />
             <div className="flex items-center justify-between border-b border-[#E8E2D9] pb-3">
               <h3 className="font-sans text-base font-bold text-[#1B1410] flex items-center space-x-2">
                 <CheckCircle2 size={18} className="text-emerald-600" />
@@ -494,6 +671,14 @@ export const PropostaPublicaPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Lightbox 3D Imersivo */}
+      <ImageLightbox
+        isOpen={lightboxOpen}
+        images={lightboxImages}
+        initialIndex={lightboxIndex}
+        onClose={() => setLightboxOpen(false)}
+      />
     </div>
   );
 };

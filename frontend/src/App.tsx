@@ -8,6 +8,7 @@ import { CriadorPropostaPage } from './pages/CriadorProposta';
 import { PreviaPropostaPage } from './pages/PreviaProposta';
 import { PropostaPublicaPage } from './pages/PropostaPublica';
 import { ContratosPage } from './pages/Contratos';
+import { FinanceiroPage } from './pages/Financeiro';
 import { ConfiguracoesPage } from './pages/Configuracoes';
 import { AlvesAuthProvider } from './context/AlvesAuthContext';
 
@@ -24,6 +25,7 @@ export function App() {
           <Route path="/propostas/:id/editar" element={<AlvesLayout><CriadorPropostaPage /></AlvesLayout>} />
           <Route path="/propostas/:id/previa" element={<AlvesLayout><PreviaPropostaPage /></AlvesLayout>} />
           <Route path="/contratos" element={<AlvesLayout><ContratosPage /></AlvesLayout>} />
+          <Route path="/financeiro" element={<AlvesLayout><FinanceiroPage /></AlvesLayout>} />
           <Route path="/configuracoes" element={<AlvesLayout><ConfiguracoesPage /></AlvesLayout>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

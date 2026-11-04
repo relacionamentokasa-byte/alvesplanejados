@@ -1,5 +1,5 @@
 import { alvesApiRequest, publicApiRequest } from './api';
-import { Cliente, Proposta, Contrato, ConfiguracoesEmpresa } from '../types/alves';
+import { Cliente, Proposta, Contrato, ConfiguracoesEmpresa, LancamentoFinanceiro, ResumoFinanceiro } from '../types/alves';
 
 export const CONFIG_INICIAL: ConfiguracoesEmpresa = {
   razaoSocial: '', nomeFantasia: 'Alves Planejados', cnpj: '', ie: '', telefone: '', whatsapp: '', email: '',
@@ -81,7 +81,7 @@ export class AlvesStore {
   }
 
   static async assinarContratoDemonstrativo(token: string, assinante: { nome: string; documento: string; email: string }): Promise<Contrato | null> {
-    return (await alvesApiRequest(`/alves/contratos/${encodeURIComponent(token)}/assinatura-demonstrativa`, { method: 'PATCH', body: JSON.stringify(assinante) })).contrato;
+    return (await alvesApiRequest(`/alves/contratos/${encodeURIComponent(token)}/assinatura-digital`, { method: 'PATCH', body: JSON.stringify(assinante) })).contrato;
   }
 
   static async getConfig(): Promise<ConfiguracoesEmpresa> {
@@ -90,5 +90,36 @@ export class AlvesStore {
 
   static async saveConfig(config: ConfiguracoesEmpresa): Promise<ConfiguracoesEmpresa> {
     return (await alvesApiRequest('/alves/configuracao', { method: 'PUT', body: JSON.stringify(config) })).configuracao;
+  }
+
+  static async getFinanceiro(): Promise<{ resumo: ResumoFinanceiro; lancamentos: LancamentoFinanceiro[] }> {
+    return await alvesApiRequest('/alves/financeiro');
+  }
+
+  static async criarLancamentoFinanceiro(lancamento: {
+    contractId?: string;
+    clientId?: string;
+    clientName: string;
+    description: string;
+    amount: number;
+    dueDate: string;
+    paymentMethod: string;
+    notes?: string;
+  }): Promise<LancamentoFinanceiro> {
+    return (await alvesApiRequest('/alves/financeiro', {
+      method: 'POST',
+      body: JSON.stringify(lancamento)
+    })).lancamento;
+  }
+
+  static async atualizarStatusFinanceiro(id: string, status: 'pendente' | 'pago' | 'cancelado', paidDate?: string): Promise<LancamentoFinanceiro> {
+    return (await alvesApiRequest(`/alves/financeiro/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, paidDate })
+    })).lancamento;
+  }
+
+  static async excluirLancamentoFinanceiro(id: string): Promise<void> {
+    await alvesApiRequest(`/alves/financeiro/${id}`, { method: 'DELETE' });
   }
 }

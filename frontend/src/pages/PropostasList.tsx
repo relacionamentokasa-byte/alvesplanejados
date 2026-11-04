@@ -16,10 +16,11 @@ import {
   Send,
   Award,
   Calendar,
-  Layers,
-  Sparkles
+  Layers
 } from 'lucide-react';
 import { AlvesStore } from '../services/alvesStore';
+import { StatusBadge } from '../components/StatusBadge';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { Proposta, ConfiguracoesEmpresa } from '../types/alves';
 
 export const PropostasListPage: React.FC = () => {
@@ -28,6 +29,9 @@ export const PropostasListPage: React.FC = () => {
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
   const [config, setConfig] = useState<ConfiguracoesEmpresa | null>(null);
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
+  const [propostaParaExcluir, setPropostaParaExcluir] = useState<{ id: string; numero: string } | null>(null);
+  const [loadingDelete, setLoadingDelete] = useState(false);
 
   const carregarPropostas = async () => {
     const [propostas, config] = await Promise.all([AlvesStore.getPropostas(), AlvesStore.getConfig()]);
@@ -50,10 +54,26 @@ export const PropostasListPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir esta proposta?')) {
-      await AlvesStore.deleteProposta(id);
+  const handleAbrirConfirmacaoExclusao = (id: string, numero?: string) => {
+    setPropostaParaExcluir({ id, numero: numero || 'selecionada' });
+  };
+
+  const handleConfirmarExclusao = async () => {
+    if (!propostaParaExcluir) return;
+    setLoadingDelete(true);
+    setExcluindoId(propostaParaExcluir.id);
+    try {
+      await AlvesStore.deleteProposta(propostaParaExcluir.id);
+      // Remove otimisticamente da lista para resposta imediata
+      setPropostas(prev => prev.filter(p => p.id !== propostaParaExcluir.id));
+      setPropostaParaExcluir(null);
       await carregarPropostas();
+    } catch (error: any) {
+      console.error('Erro ao excluir proposta:', error);
+      alert(error?.message || 'Não foi possível excluir a proposta.');
+    } finally {
+      setLoadingDelete(false);
+      setExcluindoId(null);
     }
   };
 
@@ -85,52 +105,12 @@ export const PropostasListPage: React.FC = () => {
     return matchBusca && matchStatus;
   });
 
-  const getStatusBadge = (status: Proposta['status']) => {
-    switch (status) {
-      case 'rascunho':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
-            Em Elaboração
-          </span>
-        );
-      case 'enviada':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200">
-            Enviada
-          </span>
-        );
-      case 'aprovada':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-            ✓ Aprovada
-          </span>
-        );
-      case 'solicitou_ajuste':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-800 border border-purple-200">
-            Ajustes Solicitados
-          </span>
-        );
-      case 'contrato_gerado':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#FAF3E8] text-[#9E7E45] border border-[#C5A265]/40">
-            Contrato Gerado
-          </span>
-        );
-      default:
-        return <span>{status}</span>;
-    }
-  };
-
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-sans text-2xl font-semibold text-[#231B15]">Propostas Comerciais</h1>
-          <p className="text-xs text-[#6E645C] mt-1">
-            Gerencie todas as propostas, controle versões (V1, V2, V3) e acompanhe as aprovações.
-          </p>
         </div>
 
         <Link
@@ -195,7 +175,7 @@ export const PropostasListPage: React.FC = () => {
                   <span className="text-[11px] bg-[#FAF3E8] text-[#9E7E45] border border-[#C5A265]/40 px-2 py-0.5 rounded-md font-semibold">
                     Versão {prop.versao}
                   </span>
-                  {getStatusBadge(prop.status)}
+                  <StatusBadge status={prop.status} />
                 </div>
 
                 <div>
@@ -218,15 +198,15 @@ export const PropostasListPage: React.FC = () => {
               </div>
 
               {/* Valores e Ações */}
-              <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between border-t lg:border-t-0 pt-3 lg:pt-0 border-[#E8E2D9] gap-3">
+              <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end justify-between border-t lg:border-t-0 pt-3 lg:pt-0 border-[#E8E2D9] gap-3 w-full lg:w-auto">
                 <div className="text-left lg:text-right">
-                  <span className="text-[11px] text-[#6E645C] block">Investimento Total</span>
+                  <span className="text-[11px] text-[#6E645C] block">Valor Total</span>
                   <div className="font-sans text-lg font-bold text-[#C5A265]">
                     {formatarMoeda(prop.condicoes.valorFinal)}
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-1.5 text-xs">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs w-full sm:w-auto justify-end">
                   <button
                     onClick={() => handleCriarNovaVersao(prop)}
                     title="Criar Nova Versão (V+1)"
@@ -258,7 +238,7 @@ export const PropostasListPage: React.FC = () => {
                     className="flex items-center space-x-1 px-3 py-2 bg-[#1B1410] hover:bg-[#2A1F19] text-[#FAF8F5] rounded-xl font-semibold transition-colors"
                   >
                     <Eye size={13} className="text-[#C5A265]" />
-                    <span>Ver Proposta</span>
+                    <span>Ver</span>
                   </Link>
 
                   <Link
@@ -269,9 +249,10 @@ export const PropostasListPage: React.FC = () => {
                   </Link>
 
                   <button
-                    onClick={() => handleDelete(prop.id)}
+                    onClick={() => handleAbrirConfirmacaoExclusao(prop.id, prop.numero)}
+                    disabled={excluindoId === prop.id}
                     title="Excluir Proposta"
-                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl border border-red-100 transition-colors"
+                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl border border-red-200 transition-colors disabled:opacity-40"
                   >
                     <Trash2 size={15} />
                   </button>
@@ -281,6 +262,21 @@ export const PropostasListPage: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Modal Moderno de Confirmação de Exclusão (sem window.confirm) */}
+      <ConfirmModal
+        isOpen={Boolean(propostaParaExcluir)}
+        title="Excluir Proposta"
+        message={`Tem certeza que deseja excluir permanentemente a proposta ${propostaParaExcluir?.numero || ''}? Esta ação removerá a proposta e os contratos vinculados a ela.`}
+        confirmLabel="Sim, Excluir Proposta"
+        cancelLabel="Cancelar"
+        variant="danger"
+        loading={loadingDelete}
+        onConfirm={handleConfirmarExclusao}
+        onCancel={() => {
+          if (!loadingDelete) setPropostaParaExcluir(null);
+        }}
+      />
     </div>
   );
 };

@@ -35,4 +35,23 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+# Arquivos de dados temporários e extrações
+*.jsonl
+libus_*.json
+odoo_dump.html
+drive_folder_sample.html
+backend/extract_*.js
+backend/inspect_*.js
+backend/scrape_*.js
+backend/download_*.js
+backend/parse_*.js
+backend/populate_*.ts
+backend/sync_*.ts
+backend/set_*.ts
+backend/apply_*.ts
+backend/create_demo_*.ts
 .claude/
+backend/create_clean_demo.ts
+backend/prisma/dev.db*
+backend/dist/
+frontend/dist/

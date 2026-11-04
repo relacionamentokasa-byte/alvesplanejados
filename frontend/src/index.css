@@ -2,10 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Quottery';
+  src: url('/fonts/Quottery.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nunito Sans';
+  src: url('/fonts/Nunito-Variable.ttf') format('truetype');
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nunito Sans';
+  src: url('/fonts/Nunito-Variable-Italic.ttf') format('truetype');
+  font-weight: 200 900;
+  font-style: italic;
+  font-display: swap;
+}
+
 :root {
   font-family: "Montserrat", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Otimização mobile-first global */
+html, body {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+button, a, input, select, textarea {
+  touch-action: manipulation;
+}
+
+/* Utilitários de Safe Area do iOS / Android */
+.pt-safe {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.pl-safe {
+  padding-left: max(0.5rem, env(safe-area-inset-left));
+}
+
+.pr-safe {
+  padding-right: max(0.5rem, env(safe-area-inset-right));
+}
+
+.min-h-dvh {
+  min-height: 100dvh;
+}
+
+.h-dvh {
+  height: 100dvh;
 }
 
 /* Ocultar barra de rolagem nativa mantendo funcionalidade de swipe */

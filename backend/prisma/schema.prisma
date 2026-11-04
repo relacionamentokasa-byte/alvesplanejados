@@ -14,6 +14,7 @@ model User {
   passwordHash         String
   role                 String    @default("TECNICO") // ADMIN, GESTOR, TECNICO
   active               Boolean   @default(true)
+  mustChangePassword   Boolean   @default(false)
   superiorId           String?
   superior             User?     @relation("UserHierarchy", fields: [superiorId], references: [id])
   subordinates         User[]    @relation("UserHierarchy")
@@ -378,12 +379,35 @@ model AlvesContract {
   clauses            Json
   publicToken        String        @unique
   signature          Json?
+  financialEntries   AlvesFinancialEntry[]
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
   @@index([clientId])
   @@index([proposalId])
   @@map("alves_contracts")
+}
+
+model AlvesFinancialEntry {
+  id              String        @id @default(uuid())
+  contractId      String?
+  contract        AlvesContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  clientId        String?
+  clientName      String
+  description     String
+  amount          Decimal       @db.Decimal(14, 2)
+  dueDate         DateTime
+  paidDate        DateTime?
+  status          String        @default("pendente") // pendente, pago, cancelado
+  paymentMethod   String        @default("pix") // pix, boleto, cartao, transferencia, dinheiro
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([contractId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("alves_financial_entries")
 }
 
 model AlvesConfiguration {

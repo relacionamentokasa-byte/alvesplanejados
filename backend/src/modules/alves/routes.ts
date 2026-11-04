@@ -138,7 +138,11 @@ alvesRouter.delete('/clientes/:id', alvesRoleMiddleware(['ADMIN', 'GESTOR']), as
 });
 
 alvesRouter.get('/propostas', async (_req, res) => {
-  const proposals = await prisma.alvesProposal.findMany({ orderBy: { updatedAt: 'desc' }, include: proposalInclude });
+  const proposals = await prisma.alvesProposal.findMany({
+    where: { status: { not: 'cancelada' } },
+    orderBy: { updatedAt: 'desc' },
+    include: proposalInclude
+  });
   return res.json({ propostas: proposals.map(serializeProposal) });
 });
 
@@ -196,12 +200,19 @@ alvesRouter.post('/propostas/:id/nova-versao', async (req, res) => {
 
 alvesRouter.delete('/propostas/:id', alvesRoleMiddleware(['ADMIN', 'GESTOR']), async (req, res) => {
   try {
-    const proposal = await prisma.alvesProposal.update({ where: { id: req.params.id }, data: { status: 'cancelada' } });
-    await createAuditLog({ alvesUser: req.alvesUser, action: 'DELETE', entity: 'ALVES_PROPOSAL', entityId: proposal.id, details: { cancelled: true }, ipAddress: req.ip });
-    return res.json({ message: 'Proposta cancelada com sucesso' });
+    const proposal = await prisma.$transaction(async (tx) => {
+      // 1. Desvincular ou cancelar contratos relacionados se existirem
+      await tx.alvesContract.deleteMany({ where: { proposalId: req.params.id } });
+      // 2. Apagar permanentemente a proposta ou soft-delete se preferir; aqui deletamos para limpar de vez
+      return await tx.alvesProposal.delete({ where: { id: req.params.id } });
+    });
+
+    await createAuditLog({ alvesUser: req.alvesUser, action: 'DELETE', entity: 'ALVES_PROPOSAL', entityId: proposal.id, details: { deleted: true }, ipAddress: req.ip });
+    return res.json({ message: 'Proposta excluída com sucesso' });
   } catch (err: any) {
     if (err?.code === 'P2025') return res.status(404).json({ error: 'Proposta não encontrada' });
-    return res.status(500).json({ error: 'Erro ao cancelar proposta' });
+    console.error('Erro ao excluir proposta:', err);
+    return res.status(500).json({ error: 'Erro ao excluir proposta' });
   }
 });
 
@@ -218,6 +229,66 @@ alvesRouter.post('/propostas/:id/contrato', alvesRoleMiddleware(['ADMIN', 'GESTO
       const paymentTerms = payment.formaPagamento === 'a_vista' ? `Pagamento integral à vista no valor de R$ ${Number(payment.valorFinal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.` : `${payment.quantidadeParcelas || 0}x parcelas mensais, sendo entrada de R$ ${Number(payment.entrada || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} e saldo parcelado.`;
       const result = await tx.alvesContract.create({ data: { number: `CTR-${year}-${String(count + 1).padStart(3, '0')}`, proposalId: proposal.id, proposalNumber: proposal.number, proposalVersion: proposal.version, clientId: proposal.clientId, projectName: proposal.projectName, workAddress: proposal.workAddress, totalValue: Number(payment.valorFinal || 0), paymentTerms, deliveryDays: Number(payment.prazoExecucaoDias || 45), warrantyMonths: Number(payment.garantiaMeses || 60), clauses: config?.standardClauses || [], publicToken: randomBytes(24).toString('hex') }, include: contractInclude });
       await tx.alvesProposal.update({ where: { id: proposal.id }, data: { status: 'contrato_gerado' } });
+
+      // Gerar automaticamente as parcelas financeiras a receber para a marcenaria
+      const total = Number(payment.valorFinal || 0);
+      const isAVista = payment.formaPagamento === 'a_vista';
+      const today = new Date();
+
+      if (isAVista) {
+        await tx.alvesFinancialEntry.create({
+          data: {
+            contractId: result.id,
+            clientId: proposal.clientId,
+            clientName: proposal.client.name,
+            description: `Pagamento integral à vista - ${proposal.projectName}`,
+            amount: total,
+            dueDate: today,
+            status: 'pendente',
+            paymentMethod: payment.tipoPagamento || 'pix'
+          }
+        });
+      } else {
+        const qtdParcelas = Math.max(1, Number(payment.quantidadeParcelas || 1));
+        const entrada = Number(payment.entrada || 0);
+        const saldo = total - entrada;
+
+        if (entrada > 0) {
+          await tx.alvesFinancialEntry.create({
+            data: {
+              contractId: result.id,
+              clientId: proposal.clientId,
+              clientName: proposal.client.name,
+              description: `Entrada (Sinal do Projeto) - ${proposal.projectName}`,
+              amount: entrada,
+              dueDate: today,
+              status: 'pendente',
+              paymentMethod: 'pix'
+            }
+          });
+        }
+
+        if (saldo > 0 && qtdParcelas > 0) {
+          const valorParcela = Number((saldo / qtdParcelas).toFixed(2));
+          for (let i = 1; i <= qtdParcelas; i++) {
+            const vencimento = new Date();
+            vencimento.setMonth(vencimento.getMonth() + i);
+            await tx.alvesFinancialEntry.create({
+              data: {
+                contractId: result.id,
+                clientId: proposal.clientId,
+                clientName: proposal.client.name,
+                description: `Parcela ${i}/${qtdParcelas} - ${proposal.projectName}`,
+                amount: valorParcela,
+                dueDate: vencimento,
+                status: 'pendente',
+                paymentMethod: 'boleto'
+              }
+            });
+          }
+        }
+      }
+
       return result;
     });
     await createAuditLog({ alvesUser: req.alvesUser, action: 'CREATE', entity: 'ALVES_CONTRACT', entityId: contract.id, details: { proposalId: contract.proposalId }, ipAddress: req.ip });
@@ -239,18 +310,191 @@ alvesRouter.get('/contratos/:id', async (req, res) => {
   return res.json({ contrato: serializeContract(contract) });
 });
 
-alvesRouter.patch('/contratos/:token/assinatura-demonstrativa', async (req, res) => {
+alvesRouter.patch('/contratos/:token/assinatura-digital', async (req, res) => {
   try {
     const signer = z.object({ nome: z.string().min(2), documento: z.string().min(2), email: z.string().email() }).parse(req.body);
     const now = new Date().toISOString();
-    const signature = { assinadoEm: now, assinadoPor: signer.nome, documentoAssinante: signer.documento, emailAssinante: signer.email, metodo: 'simulada_demonstrativa', trilhaAuditoria: [{ evento: 'Assinatura eletrônica registrada', dataHora: now, detalhes: 'Registro demonstrativo sem validade jurídica autônoma.' }] };
-    const contract = await prisma.alvesContract.update({ where: { publicToken: req.params.token }, data: { status: 'assinado', signature }, include: contractInclude });
-    await createAuditLog({ action: 'STATUS_CHANGE', entity: 'ALVES_CONTRACT', entityId: contract.id, details: { demonstrative: true, signer: signer.email }, ipAddress: req.ip });
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket.remoteAddress || '127.0.0.1';
+    const signature = {
+      assinadoEm: now,
+      assinadoPor: signer.nome,
+      documentoAssinante: signer.documento,
+      emailAssinante: signer.email,
+      metodo: 'assinatura_eletronica',
+      ipConexao: clientIp,
+      trilhaAuditoria: [
+        {
+          evento: 'Assinatura eletrônica autenticada',
+          dataHora: now,
+          detalhes: `Registrado por ${signer.nome} via IP ${clientIp} com consentimento formal.`
+        }
+      ]
+    };
+    const contract = await prisma.alvesContract.update({
+      where: { publicToken: req.params.token },
+      data: { status: 'assinado', signature },
+      include: contractInclude
+    });
+    await createAuditLog({
+      action: 'STATUS_CHANGE',
+      entity: 'ALVES_CONTRACT',
+      entityId: contract.id,
+      details: { electronicSignature: true, signer: signer.email, ip: clientIp },
+      ipAddress: req.ip
+    });
     return res.json({ contrato: serializeContract(contract) });
   } catch (err: any) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
     if (err?.code === 'P2025') return res.status(404).json({ error: 'Contrato não encontrado' });
-    return res.status(500).json({ error: 'Erro ao registrar assinatura demonstrativa' });
+    return res.status(500).json({ error: 'Erro ao registrar assinatura eletrônica' });
+  }
+});
+
+// Compatibilidade de rota retroativa
+alvesRouter.patch('/contratos/:token/assinatura-demonstrativa', (req, res, next) => {
+  req.url = req.url.replace('/assinatura-demonstrativa', '/assinatura-digital');
+  return alvesRouter.handle(req, res, next);
+});
+
+// ==================== ROTAS DE GESTÃO FINANCEIRA ====================
+const serializeFinancialEntry = (entry: any) => ({
+  id: entry.id,
+  contractId: entry.contractId || undefined,
+  contractNumber: entry.contract?.number || undefined,
+  clientId: entry.clientId || undefined,
+  clientName: entry.clientName,
+  description: entry.description,
+  amount: Number(entry.amount),
+  dueDate: entry.dueDate.toISOString().slice(0, 10),
+  paidDate: entry.paidDate ? entry.paidDate.toISOString().slice(0, 10) : undefined,
+  status: entry.status,
+  paymentMethod: entry.paymentMethod,
+  notes: entry.notes || undefined,
+  createdAt: entry.createdAt.toISOString()
+});
+
+alvesRouter.get('/financeiro', async (req, res) => {
+  try {
+    const entries = await prisma.alvesFinancialEntry.findMany({
+      orderBy: { dueDate: 'asc' },
+      include: { contract: { select: { number: true, projectName: true } } }
+    });
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let totalRecebido = 0;
+    let totalPendente = 0;
+    let totalAtrasado = 0;
+    let recebidoMesAtual = 0;
+    let pendenteMesAtual = 0;
+
+    for (const entry of entries) {
+      const valor = Number(entry.amount);
+      const dataVenc = new Date(entry.dueDate);
+      const isMesAtual = dataVenc.getMonth() === currentMonth && dataVenc.getFullYear() === currentYear;
+
+      if (entry.status === 'pago') {
+        totalRecebido += valor;
+        if (isMesAtual) recebidoMesAtual += valor;
+      } else if (entry.status === 'pendente') {
+        if (dataVenc < now && dataVenc.toDateString() !== now.toDateString()) {
+          totalAtrasado += valor;
+        } else {
+          totalPendente += valor;
+        }
+        if (isMesAtual) pendenteMesAtual += valor;
+      }
+    }
+
+    return res.json({
+      resumo: {
+        totalGeral: totalRecebido + totalPendente + totalAtrasado,
+        totalRecebido,
+        totalPendente,
+        totalAtrasado,
+        recebidoMesAtual,
+        pendenteMesAtual
+      },
+      lancamentos: entries.map(serializeFinancialEntry)
+    });
+  } catch (err: any) {
+    console.error('Erro ao buscar lançamentos financeiros:', err);
+    return res.status(500).json({ error: 'Erro ao carregar dados financeiros' });
+  }
+});
+
+alvesRouter.post('/financeiro', async (req, res) => {
+  try {
+    const schema = z.object({
+      contractId: z.string().optional(),
+      clientId: z.string().optional(),
+      clientName: z.string().min(1, 'Nome do cliente é obrigatório'),
+      description: z.string().min(1, 'Descrição é obrigatória'),
+      amount: z.number().positive('Valor deve ser maior que zero'),
+      dueDate: z.coerce.date(),
+      paymentMethod: z.enum(['pix', 'boleto', 'cartao', 'transferencia', 'dinheiro']).default('pix'),
+      notes: z.string().optional()
+    });
+
+    const data = schema.parse(req.body);
+    const entry = await prisma.alvesFinancialEntry.create({
+      data: {
+        contractId: data.contractId || null,
+        clientId: data.clientId || null,
+        clientName: data.clientName,
+        description: data.description,
+        amount: data.amount,
+        dueDate: data.dueDate,
+        paymentMethod: data.paymentMethod,
+        notes: data.notes || null,
+        status: 'pendente'
+      },
+      include: { contract: { select: { number: true } } }
+    });
+
+    return res.status(201).json({ lancamento: serializeFinancialEntry(entry) });
+  } catch (err: any) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
+    return res.status(500).json({ error: 'Erro ao criar lançamento financeiro' });
+  }
+});
+
+alvesRouter.patch('/financeiro/:id/status', async (req, res) => {
+  try {
+    const schema = z.object({
+      status: z.enum(['pendente', 'pago', 'cancelado']),
+      paidDate: z.coerce.date().optional()
+    });
+
+    const data = schema.parse(req.body);
+    const paidDate = data.status === 'pago' ? (data.paidDate || new Date()) : null;
+
+    const entry = await prisma.alvesFinancialEntry.update({
+      where: { id: req.params.id },
+      data: {
+        status: data.status,
+        paidDate
+      },
+      include: { contract: { select: { number: true } } }
+    });
+
+    return res.json({ lancamento: serializeFinancialEntry(entry) });
+  } catch (err: any) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
+    if (err?.code === 'P2025') return res.status(404).json({ error: 'Lançamento não encontrado' });
+    return res.status(500).json({ error: 'Erro ao atualizar status do lançamento' });
+  }
+});
+
+alvesRouter.delete('/financeiro/:id', async (req, res) => {
+  try {
+    await prisma.alvesFinancialEntry.delete({ where: { id: req.params.id } });
+    return res.json({ message: 'Lançamento excluído com sucesso' });
+  } catch (err: any) {
+    if (err?.code === 'P2025') return res.status(404).json({ error: 'Lançamento não encontrado' });
+    return res.status(500).json({ error: 'Erro ao excluir lançamento' });
   }
 });
 

@@ -8,18 +8,31 @@ import {
   Save,
   CheckCircle2,
   Plus,
-  Trash2,
-  Sparkles
+  Trash2
 } from 'lucide-react';
 import { AlvesStore } from '../services/alvesStore';
 import { ConfiguracoesEmpresa, ClausulaContrato } from '../types/alves';
 
 export const ConfiguracoesPage: React.FC = () => {
   const [config, setConfig] = useState<ConfiguracoesEmpresa | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
   const [salvoFeedback, setSalvoFeedback] = useState(false);
 
+  const carregar = () => {
+    setCarregando(true);
+    setErro(null);
+    AlvesStore.getConfig()
+      .then((data) => setConfig(data))
+      .catch((error) => {
+        console.error('Erro ao carregar configuração:', error);
+        setErro('Não foi possível carregar as configurações. Verifique a conexão com o servidor.');
+      })
+      .finally(() => setCarregando(false));
+  };
+
   useEffect(() => {
-    AlvesStore.getConfig().then(setConfig).catch((error) => console.error('Erro ao carregar configuração:', error));
+    carregar();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,17 +63,28 @@ export const ConfiguracoesPage: React.FC = () => {
     setConfig({ ...config, clausulasContratoPadrao: config.clausulasContratoPadrao.map(c => (c.id === id ? { ...c, ...updates } : c)) });
   };
 
-  if (!config) return <div className="p-8 text-sm text-[#6E645C]">Carregando configurações...</div>;
+  if (carregando) return <div className="p-8 text-sm text-[#6E645C]">Carregando configurações...</div>;
+
+  if (erro || !config) {
+    return (
+      <div className="p-8 text-center space-y-4">
+        <p className="text-sm text-red-600">{erro || 'Erro ao carregar configurações.'}</p>
+        <button
+          onClick={carregar}
+          className="px-4 py-2 bg-[#9E7E45] text-white text-xs font-semibold rounded-lg hover:bg-[#856834] transition-colors"
+        >
+          Tentar novamente
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto animate-fadeIn pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-sans text-2xl font-semibold text-[#231B15]">Modelos e Configurações</h1>
-          <p className="text-xs text-[#6E645C] mt-1">
-            Personalize os dados da marcenaria, textos de WhatsApp, modelos de contratos e cláusulas padrão.
-          </p>
+          <h1 className="font-sans text-2xl font-semibold text-[#231B15]">Configurações</h1>
         </div>
 
         {salvoFeedback && (
@@ -76,7 +100,7 @@ export const ConfiguracoesPage: React.FC = () => {
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
           <div className="flex items-center space-x-2 border-b border-[#E8E2D9] pb-3">
             <Building size={16} className="text-[#C5A265]" />
-            <h2 className="font-sans text-base font-semibold text-[#1B1410]">Dados Cadastrais da Alves Planejados</h2>
+            <h2 className="font-sans text-base font-semibold text-[#1B1410]">Dados Cadastrais</h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -226,7 +250,7 @@ export const ConfiguracoesPage: React.FC = () => {
         <div className="flex justify-end">
           <button
             type="submit"
-            className="flex items-center space-x-2 px-6 py-3 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] font-bold text-xs rounded-xl shadow-gold-glow transition-all"
+            className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-[#C5A265] hover:bg-[#DFC28B] text-[#1B1410] font-bold text-xs rounded-xl shadow-gold-glow transition-all"
           >
             <Save size={16} />
             <span>Salvar Todas as Configurações</span>

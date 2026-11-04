@@ -112,7 +112,8 @@ export interface AssinaturaContrato {
   assinadoPor: string;
   documentoAssinante: string;
   emailAssinante: string;
-  metodo: 'simulada_demonstrativa' | 'validada_externa';
+  metodo: 'assinatura_eletronica' | 'validada_externa' | 'simulada_demonstrativa';
+  ipConexao?: string;
   ipSimulado?: string;
   trilhaAuditoria: {
     evento: string;
@@ -160,4 +161,29 @@ export interface ConfiguracoesEmpresa {
   inclusoPadrao: string[];
   naoInclusoPadrao: string[];
   clausulasContratoPadrao: ClausulaContrato[];
+}
+
+export interface LancamentoFinanceiro {
+  id: string;
+  contractId?: string;
+  contractNumber?: string;
+  clientId?: string;
+  clientName: string;
+  description: string;
+  amount: number;
+  dueDate: string;
+  paidDate?: string;
+  status: 'pendente' | 'pago' | 'cancelado';
+  paymentMethod: 'pix' | 'boleto' | 'cartao' | 'transferencia' | 'dinheiro';
+  notes?: string;
+  createdAt: string;
+}
+
+export interface ResumoFinanceiro {
+  totalGeral: number;
+  totalRecebido: number;
+  totalPendente: number;
+  totalAtrasado: number;
+  recebidoMesAtual: number;
+  pendenteMesAtual: number;
 }

@@ -2,18 +2,18 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { BrandMark } from './BrandMark';
 import { AlvesAuthGuard } from './AlvesAuthGuard';
+import { useAlvesAuth } from '../context/AlvesAuthContext';
 import {
   LayoutDashboard,
   Users,
   FileText,
   FileCheck,
+  DollarSign,
   Settings,
   PlusCircle,
   Menu,
   X,
-  ExternalLink,
-  ChevronRight,
-  Sparkles
+  ChevronRight
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -22,6 +22,7 @@ interface LayoutProps {
 
 export const AlvesLayout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const { user } = useAlvesAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navigation = [
@@ -29,6 +30,7 @@ export const AlvesLayout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Clientes', href: '/clientes', icon: Users },
     { name: 'Propostas', href: '/propostas', icon: FileText },
     { name: 'Contratos', href: '/contratos', icon: FileCheck },
+    { name: 'Financeiro', href: '/financeiro', icon: DollarSign },
     { name: 'Modelos e Configurações', href: '/configuracoes', icon: Settings },
   ];
 
@@ -41,14 +43,24 @@ export const AlvesLayout: React.FC<LayoutProps> = ({ children }) => {
     <AlvesAuthGuard>
     <div className="min-h-screen bg-[#FAF8F5] flex flex-col md:flex-row text-[#231B15]">
       {/* Mobile Header */}
-      <div className="md:hidden bg-[#1B1410] text-[#FAF8F5] px-4 py-3 flex items-center justify-between border-b border-[#2A1F19] sticky top-0 z-40">
+      <div className="md:hidden bg-[#1B1410] text-[#FAF8F5] px-4 py-2.5 pt-safe flex items-center justify-between border-b border-[#2A1F19] sticky top-0 z-40 shadow-sm">
         <BrandMark variant="header" contrast="light" className="!px-1.5 !py-1" />
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 rounded-lg bg-[#2A1F19] text-[#C5A265] hover:bg-[#382B23] transition-colors"
-        >
-          {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        <div className="flex items-center space-x-2">
+          <Link
+            to="/configuracoes"
+            className="p-2 rounded-lg bg-[#2A1F19] text-[#D9D2C7] hover:text-[#C5A265] transition-colors"
+            title="Configurações"
+          >
+            <Settings size={18} />
+          </Link>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Abrir menu"
+            className="p-2 rounded-lg bg-[#2A1F19] text-[#C5A265] hover:bg-[#382B23] transition-colors"
+          >
+            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Sidebar for Desktop & Mobile Overlay */}
@@ -111,18 +123,10 @@ export const AlvesLayout: React.FC<LayoutProps> = ({ children }) => {
           })}
         </nav>
 
-        {/* Footer info */}
-        <div className="p-4 border-t border-[#2A1F19] bg-[#140E0B]/70">
-          <div className="flex items-center justify-between text-xs text-[#8C7D73]">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Ambiente Ativo</span>
-            </div>
-            <span className="text-[11px] font-mono text-[#C5A265]/80">v1.0 • Kasa</span>
-          </div>
-          <div className="mt-2 text-[11px] text-[#6E645C] text-center">
-            Desenvolvido para Alves Planejados
-          </div>
+        {/* Footer info limpo */}
+        <div className="p-4 border-t border-[#2A1F19] bg-[#140E0B]/70 flex items-center justify-between text-xs text-[#8C7D73]">
+          <span>Alves Planejados</span>
+          <span className="text-[11px] font-mono text-[#C5A265]/80">v1.0</span>
         </div>
       </aside>
 
@@ -160,17 +164,83 @@ export const AlvesLayout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex items-center space-x-2.5 pl-2">
               <BrandMark variant="monogram" />
               <div className="text-left">
-                <div className="text-xs font-semibold text-[#231B15]">Consultor Alves</div>
-                <div className="text-[10px] text-[#9B9087]">São Paulo, SP</div>
+                <div className="text-xs font-semibold text-[#231B15]">{user?.name || 'Elioenai Alves'}</div>
+                <div className="text-[10px] text-[#9B9087]">Alves Planejados</div>
               </div>
             </div>
           </div>
         </header>
 
         {/* Page Container */}
-        <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <div className="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-24 md:pb-8">
           {children}
         </div>
+
+        {/* Mobile Bottom Navigation Bar - Ergonômica de Última Geração (Thumb Zone) */}
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#1B1410]/95 backdrop-blur-lg border-t border-[#2A1F19] pb-safe px-2 shadow-2xl">
+          <div className="flex items-center justify-around h-16 max-w-md mx-auto relative">
+            <Link
+              to="/"
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${
+                isCurrent('/') ? 'text-[#C5A265]' : 'text-[#8C7D73] hover:text-[#FAF8F5]'
+              }`}
+            >
+              <LayoutDashboard size={20} className={isCurrent('/') ? 'scale-110' : ''} />
+              <span className="text-[10px] mt-1 font-medium">Início</span>
+            </Link>
+
+            <Link
+              to="/clientes"
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${
+                isCurrent('/clientes') ? 'text-[#C5A265]' : 'text-[#8C7D73] hover:text-[#FAF8F5]'
+              }`}
+            >
+              <Users size={20} className={isCurrent('/clientes') ? 'scale-110' : ''} />
+              <span className="text-[10px] mt-1 font-medium">Clientes</span>
+            </Link>
+
+            {/* Botão Central de Nova Proposta em Destaque */}
+            <div className="flex-1 flex justify-center -mt-5">
+              <Link
+                to="/propostas/nova"
+                className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#9E7E45] via-[#C5A265] to-[#DFC28B] text-[#1B1410] flex items-center justify-center shadow-lg shadow-[#C5A265]/30 active:scale-95 transition-transform border-2 border-[#1B1410]"
+                title="Criar Nova Proposta"
+              >
+                <PlusCircle size={26} className="text-[#1B1410]" />
+              </Link>
+            </div>
+
+            <Link
+              to="/propostas"
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${
+                isCurrent('/propostas') && location.pathname !== '/propostas/nova' ? 'text-[#C5A265]' : 'text-[#8C7D73] hover:text-[#FAF8F5]'
+              }`}
+            >
+              <FileText size={20} className={isCurrent('/propostas') && location.pathname !== '/propostas/nova' ? 'scale-110' : ''} />
+              <span className="text-[10px] mt-1 font-medium">Propostas</span>
+            </Link>
+
+            <Link
+              to="/contratos"
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${
+                isCurrent('/contratos') ? 'text-[#C5A265]' : 'text-[#8C7D73] hover:text-[#FAF8F5]'
+              }`}
+            >
+              <FileCheck size={20} className={isCurrent('/contratos') ? 'scale-110' : ''} />
+              <span className="text-[10px] mt-1 font-medium">Contratos</span>
+            </Link>
+
+            <Link
+              to="/financeiro"
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${
+                isCurrent('/financeiro') ? 'text-[#C5A265]' : 'text-[#8C7D73] hover:text-[#FAF8F5]'
+              }`}
+            >
+              <DollarSign size={20} className={isCurrent('/financeiro') ? 'scale-110' : ''} />
+              <span className="text-[10px] mt-1 font-medium">Financeiro</span>
+            </Link>
+          </div>
+        </nav>
       </main>
     </div>
     </AlvesAuthGuard>

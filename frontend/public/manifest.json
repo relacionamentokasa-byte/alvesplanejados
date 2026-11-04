@@ -1,15 +1,15 @@
 {
-  "name": "Libus Partner",
-  "short_name": "LibusPartner",
-  "description": "Engenharia de Segurança & Homologação de EPIs em Campo",
+  "name": "Alves Planejados | Gestão & Propostas",
+  "short_name": "Alves Planejados",
+  "description": "Marcenaria & Mobiliário Sob Medida de Alto Padrão - Propostas, Contratos e Financeiro",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0F141F",
-  "theme_color": "#0F141F",
+  "background_color": "#1B1410",
+  "theme_color": "#1B1410",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "/favicon-alves.svg",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
